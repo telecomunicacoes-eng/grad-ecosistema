@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ':*)",
+      "Bash(python fix_pdf.py)",
+      "Bash(python -c ':*)",
+      "Bash(python fix_charts.py)"
+    ]
+  }
+}

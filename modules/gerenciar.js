@@ -7,13 +7,13 @@ const Gerenciar = {
   _aba: 'sites',
 
   async render(container) {
-    if (!Auth.isGrad()) {
+    if (!Auth.isAdmin()) {
       container.innerHTML = `
         <div class="page fade-in">
           <div class="empty-state" style="height:300px">
             <div class="empty-state-icon">🔒</div>
             <div class="empty-state-title">Acesso restrito</div>
-            <div class="empty-state-sub">Esta área é exclusiva para usuários GRAD</div>
+            <div class="empty-state-sub">Esta área é exclusiva para administradores</div>
           </div>
         </div>`;
       return;

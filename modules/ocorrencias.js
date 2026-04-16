@@ -18,7 +18,7 @@ const Ocorrencias = {
           </div>
           <div class="page-actions">
             <button class="btn btn-ghost btn-sm" onclick="Ocorrencias.refresh()">↻ Atualizar</button>
-            <button class="btn btn-primary btn-sm perm-grad" onclick="Ocorrencias.abrirNova()">+ Nova ocorrência</button>
+            <button class="btn btn-primary btn-sm perm-edit" onclick="Ocorrencias.abrirNova()">+ Nova ocorrência</button>
           </div>
         </div>
 
@@ -165,8 +165,8 @@ const Ocorrencias = {
           <td>
             <div style="display:flex;gap:4px">
               <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();Ocorrencias.verDetalhes('${o.id}')">Ver</button>
-              <button class="btn btn-ghost btn-sm perm-grad" onclick="event.stopPropagation();Ocorrencias.editar('${o.id}')">✎</button>
-              <button class="btn btn-ghost btn-sm perm-grad" onclick="event.stopPropagation();Ocorrencias.fechar('${o.id}')">✔ Fechar</button>
+              <button class="btn btn-ghost btn-sm perm-edit" onclick="event.stopPropagation();Ocorrencias.editar('${o.id}')">✎</button>
+              <button class="btn btn-ghost btn-sm perm-edit" onclick="event.stopPropagation();Ocorrencias.fechar('${o.id}')">✔ Fechar</button>
             </div>
           </td>
         </tr>`;
@@ -325,7 +325,7 @@ const Ocorrencias = {
       </div>`,
       [
         { label: 'Fechar', class: 'btn-ghost', onclick: 'Modal.close()' },
-        { label: '✎ Editar', class: 'btn-primary perm-grad', onclick: `Modal.close();Ocorrencias.editar('${id}')` }
+        { label: '✎ Editar', class: 'btn-primary perm-edit', onclick: `Modal.close();Ocorrencias.editar('${id}')` }
       ]
     );
   },

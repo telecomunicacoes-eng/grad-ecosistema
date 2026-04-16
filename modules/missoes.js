@@ -18,7 +18,7 @@ const Missoes = {
           </div>
           <div class="page-actions">
             <button class="btn btn-ghost btn-sm" onclick="Missoes.refresh()">↻ Atualizar</button>
-            <button class="btn btn-primary btn-sm perm-grad" onclick="Missoes.nova()">+ Nova missão</button>
+            <button class="btn btn-primary btn-sm perm-edit" onclick="Missoes.nova()">+ Nova missão</button>
           </div>
         </div>
 
@@ -134,7 +134,7 @@ const Missoes = {
             <span class="badge ${statusCor[m.status]||'badge-gray'}">${m.status||'—'}</span>
             ${m.tipo ? `<span class="badge ${tipoCor[m.tipo]||'badge-gray'}" style="margin-left:4px">${m.tipo}</span>` : ''}
           </div>
-          <div class="perm-grad" style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <div class="perm-edit" style="display:flex;gap:4px" onclick="event.stopPropagation()">
             <button class="btn btn-ghost btn-sm" onclick="Missoes.editar('${m.id}')">✎</button>
           </div>
         </div>
@@ -267,7 +267,7 @@ const Missoes = {
       </div>`,
       [
         { label: 'Fechar',  class: 'btn-ghost',   onclick: 'Modal.close()' },
-        { label: '✎ Editar', class: 'btn-primary perm-grad', onclick: `Modal.close();Missoes.editar('${id}')` }
+        { label: '✎ Editar', class: 'btn-primary perm-edit', onclick: `Modal.close();Missoes.editar('${id}')` }
       ]
     );
   },

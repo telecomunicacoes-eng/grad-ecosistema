@@ -19,7 +19,7 @@ const Issi = {
           <div class="page-actions">
             <button class="btn btn-ghost btn-sm" onclick="Issi.exportar()">↓ Exportar CSV</button>
             <button class="btn btn-ghost btn-sm" onclick="Issi.refresh()">↻ Atualizar</button>
-            <button class="btn btn-primary btn-sm perm-grad" onclick="Issi.novo()">+ Novo rádio</button>
+            <button class="btn btn-primary btn-sm perm-edit" onclick="Issi.novo()">+ Novo rádio</button>
           </div>
         </div>
 
@@ -186,7 +186,7 @@ const Issi = {
         <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${r.serial||'—'}</td>
         <td>
           <div style="display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm perm-grad" onclick="event.stopPropagation();Issi.editar('${r.id}')">✎</button>
+            <button class="btn btn-ghost btn-sm perm-edit" onclick="event.stopPropagation();Issi.editar('${r.id}')">✎</button>
           </div>
         </td>
       </tr>`).join('');
@@ -258,7 +258,7 @@ const Issi = {
       </div>`,
       [
         { label: 'Fechar',   class: 'btn-ghost',   onclick: 'Modal.close()' },
-        { label: '✎ Editar', class: 'btn-primary perm-grad', onclick: `Modal.close();Issi.editar('${id}')` }
+        { label: '✎ Editar', class: 'btn-primary perm-edit', onclick: `Modal.close();Issi.editar('${id}')` }
       ]
     );
   },
