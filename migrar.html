@@ -5,105 +5,76 @@
 <title>Migração Firebase → Supabase · GRAD</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0 }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
-  h1  { font-size: 20px; font-weight: 800; color: #3b82f6; margin-bottom: 4px }
-  p.sub { font-size: 12px; color: #64748b; margin-bottom: 24px }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; max-width: 800px; margin: 0 auto }
+  h1  { font-size: 22px; font-weight: 800; color: #3b82f6; margin-bottom: 4px }
+  .sub { font-size: 12px; color: #64748b; margin-bottom: 28px }
   .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px; margin-bottom: 16px }
-  .card h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #94a3b8 }
-  .step { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #334155 }
-  .step:last-child { border-bottom: none }
-  .step-num { width: 28px; height: 28px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0 }
-  .step-num.ok   { background: #22c55e; color: #fff }
-  .step-num.err  { background: #ef4444; color: #fff }
-  .step-num.run  { background: #fbbf24; color: #000 }
-  .step-label { flex: 1; font-size: 13px }
-  .step-count { font-size: 12px; color: #64748b; font-family: monospace }
-  .log { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; max-height: 300px; overflow-y: auto; margin-top: 12px }
-  .log-line { margin: 2px 0; color: #94a3b8 }
-  .log-line.ok  { color: #22c55e }
-  .log-line.err { color: #ef4444 }
-  .log-line.warn { color: #fbbf24 }
-  .log-line.info { color: #3b82f6 }
-  button { padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 700 }
-  .btn-primary { background: #3b82f6; color: #fff }
-  .btn-primary:hover { background: #2563eb }
-  .btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed }
-  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px }
-  .sum-card { background: #0f172a; border-radius: 8px; padding: 12px; text-align: center }
-  .sum-val { font-size: 28px; font-weight: 800; color: #3b82f6 }
-  .sum-label { font-size: 11px; color: #64748b; margin-top: 2px }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700 }
-  .badge-green { background: rgba(34,197,94,.2); color: #22c55e }
-  .badge-red   { background: rgba(239,68,68,.2);  color: #ef4444 }
-  .badge-blue  { background: rgba(59,130,246,.2); color: #3b82f6 }
+  .card-title { font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px }
+  .step { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #1e293b }
+  .num { width: 26px; height: 26px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; color: #94a3b8 }
+  .num.ok  { background: #22c55e; color: #fff }
+  .num.err { background: #ef4444; color: #fff }
+  .num.run { background: #fbbf24; color: #000 }
+  .step-label { flex: 1; font-size: 13px; color: #cbd5e1 }
+  .step-info { font-size: 11px; color: #64748b; font-family: monospace }
+  .log { background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; max-height: 320px; overflow-y: auto; margin-top: 14px; display: none }
+  .ll { padding: 1px 0 }
+  .ll.ok   { color: #22c55e }
+  .ll.err  { color: #ef4444 }
+  .ll.warn { color: #fbbf24 }
+  .ll.info { color: #60a5fa }
+  .ll.dim  { color: #475569 }
+  button { padding: 11px 28px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; transition: background .2s }
+  .btn-go  { background: #3b82f6; color: #fff }
+  .btn-go:hover:not(:disabled) { background: #2563eb }
+  .btn-go:disabled { background: #334155; color: #475569; cursor: not-allowed }
+  .kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 14px }
+  .kpi  { background: #0f172a; border-radius: 8px; padding: 12px; text-align: center }
+  .kpi-val   { font-size: 30px; font-weight: 800; color: #22c55e }
+  .kpi-label { font-size: 11px; color: #64748b; margin-top: 2px }
+  #resultado { display: none }
 </style>
 </head>
 <body>
 
 <h1>🔄 Migração de Dados</h1>
-<p class="sub">Firebase (grad-sesp) → Supabase (EcoSistema GRAD) · Seguro e sem perda de dados</p>
+<p class="sub">Firebase (grad-sesp) → Supabase (EcoSistema GRAD) · seguro, sem perda de dados</p>
 
 <div class="card">
-  <h2>📋 O que será migrado</h2>
-  <div class="step" id="s-risps">
-    <div class="step-num" id="n-risps">1</div>
-    <div class="step-label">RISPs <span style="color:#64748b;font-size:11px">(config/risps → tabela risps)</span></div>
-    <div class="step-count" id="c-risps">—</div>
+  <div class="card-title">Etapas</div>
+  <div class="step"><div class="num" id="n1">1</div><div class="step-label">RISPs</div><div class="step-info" id="i1">aguardando</div></div>
+  <div class="step"><div class="num" id="n2">2</div><div class="step-label">Motivos de Falha</div><div class="step-info" id="i2">aguardando</div></div>
+  <div class="step"><div class="num" id="n3">3</div><div class="step-label">Sites / ERBs</div><div class="step-info" id="i3">aguardando</div></div>
+  <div class="step"><div class="num" id="n4">4</div><div class="step-label">Ocorrências / Registros</div><div class="step-info" id="i4">aguardando</div></div>
+  <div style="margin-top:16px">
+    <button class="btn-go" id="btn" onclick="migrar()">▶ Iniciar Migração</button>
   </div>
-  <div class="step" id="s-motivos">
-    <div class="step-num" id="n-motivos">2</div>
-    <div class="step-label">Motivos de Falha <span style="color:#64748b;font-size:11px">(config/motivos → tabela motivos_falha)</span></div>
-    <div class="step-count" id="c-motivos">—</div>
-  </div>
-  <div class="step" id="s-sites">
-    <div class="step-num" id="n-sites">3</div>
-    <div class="step-label">Sites / Base ERBs <span style="color:#64748b;font-size:11px">(base_sites → tabela sites)</span></div>
-    <div class="step-count" id="c-sites">—</div>
-  </div>
-  <div class="step" id="s-ocorrs">
-    <div class="step-num" id="n-ocorrs">4</div>
-    <div class="step-label">Ocorrências / Registros <span style="color:#64748b;font-size:11px">(registros → tabela ocorrencias)</span></div>
-    <div class="step-count" id="c-ocorrs">—</div>
-  </div>
+  <div class="log" id="log"></div>
 </div>
 
-<div class="card">
-  <h2>🚀 Executar migração</h2>
-  <p style="font-size:12px;color:#64748b;margin-bottom:16px">
-    A migração é <strong style="color:#22c55e">não-destrutiva</strong> — dados existentes no Supabase não serão apagados.
-    Registros duplicados (mesmo nome/RISP) serão ignorados automaticamente.
-  </p>
-  <button class="btn-primary" id="btn-migrar" onclick="iniciarMigracao()">▶ Iniciar Migração</button>
-  <div id="log" class="log" style="display:none"></div>
-</div>
-
-<div class="card" id="resultado" style="display:none">
-  <h2>✅ Resultado</h2>
-  <div class="summary">
-    <div class="sum-card"><div class="sum-val" id="r-risps">0</div><div class="sum-label">RISPs</div></div>
-    <div class="sum-card"><div class="sum-val" id="r-motivos">0</div><div class="sum-label">Motivos</div></div>
-    <div class="sum-card"><div class="sum-val" id="r-sites">0</div><div class="sum-label">Sites</div></div>
-    <div class="sum-card"><div class="sum-val" id="r-ocorrs">0</div><div class="sum-label">Ocorrências</div></div>
+<div class="card" id="resultado">
+  <div class="card-title">✅ Resultado Final</div>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-val" id="r1">0</div><div class="kpi-label">RISPs</div></div>
+    <div class="kpi"><div class="kpi-val" id="r2">0</div><div class="kpi-label">Motivos</div></div>
+    <div class="kpi"><div class="kpi-val" id="r3">0</div><div class="kpi-label">Sites</div></div>
+    <div class="kpi"><div class="kpi-val" id="r4">0</div><div class="kpi-label">Ocorrências</div></div>
   </div>
-  <p style="margin-top:16px;font-size:13px;color:#22c55e;font-weight:700">
-    ✅ Migração concluída! Acesse o sistema GRAD Ecossistema e verifique os dados.
-  </p>
-  <p style="margin-top:8px;font-size:12px;color:#64748b">
-    👉 <a href="https://telecomunicacoes-eng.github.io/grad-ecosistema/" target="_blank" style="color:#3b82f6">
-      telecomunicacoes-eng.github.io/grad-ecosistema/
-    </a>
+  <p style="margin-top:16px;font-size:13px;color:#22c55e;font-weight:600">Migração concluída com sucesso!</p>
+  <p style="margin-top:6px;font-size:12px;color:#64748b">
+    Acesse: <a href="https://telecomunicacoes-eng.github.io/grad-ecosistema/" target="_blank" style="color:#3b82f6">grad-ecosistema →</a>
   </p>
 </div>
 
-<!-- Firebase -->
+<!-- Firebase compat (v9) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-// ── CREDENCIAIS ──────────────────────────────
-const FIREBASE_CONFIG = {
+// ─── CONFIG ──────────────────────────────────────────────
+const FB_CONFIG = {
   apiKey:            "AIzaSyBaLKbVgxYWZZPWh9lNM3TIJakbOVMdz3U",
   authDomain:        "grad-sesp.firebaseapp.com",
   projectId:         "grad-sesp",
@@ -111,301 +82,239 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "740822964299",
   appId:             "1:740822964299:web:3219a60dd91895976895ce"
 };
+const SB_URL = 'https://fjlwmqixqewkwweekhcz.supabase.co';
+const SB_KEY = 'sb_publishable_0TeYa3IR4XWMvhdcfjk8MA_SrhoOaiZ';
 
-const SUPABASE_URL = 'https://fjlwmqixqewkwweekhcz.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_0TeYa3IR4XWMvhdcfjk8MA_SrhoOaiZ';
+// ─── INIT ─────────────────────────────────────────────────
+firebase.initializeApp(FB_CONFIG);
+const FB = firebase.firestore();
+const SB = supabase.createClient(SB_URL, SB_KEY);
 
-// ── INIT ─────────────────────────────────────
-firebase.initializeApp(FIREBASE_CONFIG);
-const DB  = firebase.firestore();
-const supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ── UTILS ────────────────────────────────────
-let logEl;
-function log(msg, tipo = '') {
-  if (!logEl) logEl = document.getElementById('log');
-  logEl.style.display = 'block';
+// ─── LOG ──────────────────────────────────────────────────
+function log(msg, tipo) {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
   const d = document.createElement('div');
-  d.className = `log-line ${tipo}`;
-  d.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
-  logEl.appendChild(d);
-  logEl.scrollTop = logEl.scrollHeight;
+  d.className = 'll ' + (tipo || '');
+  d.textContent = '[' + new Date().toLocaleTimeString('pt-BR') + '] ' + msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
 }
 
-function setStep(id, estado, count = null) {
-  const num = document.getElementById(`n-${id}`);
-  if (num) { num.className = `step-num ${estado}`; num.textContent = estado === 'ok' ? '✓' : estado === 'err' ? '✗' : estado === 'run' ? '…' : num.textContent; }
-  if (count !== null) { const c = document.getElementById(`c-${id}`); if (c) c.textContent = count; }
+function step(n, estado, info) {
+  document.getElementById('n' + n).className = 'num ' + estado;
+  document.getElementById('n' + n).textContent = estado === 'ok' ? '✓' : estado === 'err' ? '✗' : '…';
+  if (info) document.getElementById('i' + n).textContent = info;
 }
 
-function toISODate(str) {
-  if (!str) return null;
-  if (str.includes('T')) return str;
-  return new Date(str + 'T00:00:00').toISOString();
+// ─── HELPERS ──────────────────────────────────────────────
+function toISO(v) {
+  if (!v) return null;
+  if (typeof v === 'object' && v.toDate) return v.toDate().toISOString();
+  if (typeof v === 'string' && v.includes('T')) return v;
+  if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}$/)) return v + 'T00:00:00.000Z';
+  return new Date(v).toISOString();
 }
 
-// ── MAP SITUAÇÃO ─────────────────────────────
-function mapSituacao(sit) {
+function mapSit(s) {
   const m = {
-    'Operacional':          'Operacional',
-    'Inoperante':           'Inoperante',
-    'Parcial':              'Parcial/Em analise',
-    'Parcial/Em analise':   'Parcial/Em analise',
-    'Modo Local':           'Modo Local',
-    'Em análise':           'Parcial/Em analise',
-    'Em Análise':           'Parcial/Em analise',
+    'Inoperante':         'Inoperante',
+    'Parcial':            'Parcial/Em analise',
+    'Parcial/Em analise': 'Parcial/Em analise',
+    'Em análise':         'Parcial/Em analise',
+    'Em Análise':         'Parcial/Em analise',
+    'Modo Local':         'Modo Local',
+    'Operacional':        'Operacional',
   };
-  return m[sit] || sit || 'Inoperante';
+  return m[s] || 'Inoperante';
 }
 
-// ── MIGRAÇÃO PRINCIPAL ───────────────────────
-async function iniciarMigracao() {
-  const btn = document.getElementById('btn-migrar');
+async function sbUpsert(tabela, rows, conflict) {
+  if (!rows.length) return [];
+  const { data, error } = await SB.from(tabela)
+    .upsert(rows, { onConflict: conflict, ignoreDuplicates: true })
+    .select();
+  if (error) throw new Error(tabela + ': ' + error.message);
+  return data || [];
+}
+
+// ─── MIGRAÇÃO ─────────────────────────────────────────────
+async function migrar() {
+  const btn = document.getElementById('btn');
   btn.disabled = true;
   btn.textContent = '⏳ Migrando...';
 
-  const totais = { risps: 0, motivos: 0, sites: 0, ocorrs: 0 };
-
   try {
-    // ════════════════════════════════════════
-    // PASSO 1 — RISPs
-    // ════════════════════════════════════════
-    log('Buscando RISPs no Firebase...', 'info');
-    setStep('risps', 'run');
+    // ══════════════════════════════════════
+    // 1 · RISPs
+    // ══════════════════════════════════════
+    step(1, 'run', 'lendo Firebase...');
+    log('Buscando RISPs...', 'info');
 
-    const configDoc = await DB.collection('config').doc('risps').get();
-    const listaRisps = configDoc.exists ? (configDoc.data().lista || []) : [];
-    log(`Firebase: ${listaRisps.length} RISPs encontrados`);
+    const cfgRisps = await FB.collection('config').doc('risps').get();
+    const listaRisps = cfgRisps.exists ? (cfgRisps.data().lista || []) : [];
+    log('Firebase: ' + listaRisps.length + ' RISPs');
 
-    const rispIdMap = {}; // nome → uuid
-    for (const nome of listaRisps) {
-      if (!nome || !nome.trim()) continue;
-      // Upsert: insert se não existir
-      const { data, error } = await supa
-        .from('risps')
-        .upsert({ nome: nome.trim() }, { onConflict: 'nome', ignoreDuplicates: false })
-        .select('id, nome')
-        .single();
-      if (error) {
-        // Já existe — busca o ID
-        const { data: existing } = await supa.from('risps').select('id,nome').eq('nome', nome.trim()).single();
-        if (existing) rispIdMap[nome.trim()] = existing.id;
-        log(`RISP já existe: ${nome}`, 'warn');
-      } else {
-        rispIdMap[nome.trim()] = data.id;
-        totais.risps++;
-        log(`✓ RISP inserida: ${nome}`, 'ok');
-      }
-    }
+    const rowsRisps = listaRisps
+      .map(n => n && n.trim())
+      .filter(Boolean)
+      .map(nome => ({ nome }));
 
-    // Busca todos os IDs de RISPs existentes (inclusive as que já estavam)
-    const { data: allRisps } = await supa.from('risps').select('id, nome');
-    (allRisps || []).forEach(r => { rispIdMap[r.nome] = r.id; });
+    const insertedRisps = await sbUpsert('risps', rowsRisps, 'nome');
+    log('Supabase: ' + insertedRisps.length + ' inseridas', 'ok');
 
-    setStep('risps', 'ok', `${Object.keys(rispIdMap).length} RISPs`);
-    document.getElementById('r-risps').textContent = Object.keys(rispIdMap).length;
+    // Carrega mapa completo nome→id
+    const { data: allRisps } = await SB.from('risps').select('id,nome');
+    const rispMap = {};
+    (allRisps || []).forEach(r => { rispMap[r.nome] = r.id; });
+    step(1, 'ok', Object.keys(rispMap).length + ' RISPs');
+    document.getElementById('r1').textContent = Object.keys(rispMap).length;
 
-    // ════════════════════════════════════════
-    // PASSO 2 — MOTIVOS DE FALHA
-    // ════════════════════════════════════════
-    log('Buscando Motivos no Firebase...', 'info');
-    setStep('motivos', 'run');
+    // ══════════════════════════════════════
+    // 2 · Motivos
+    // ══════════════════════════════════════
+    step(2, 'run', 'lendo Firebase...');
+    log('Buscando Motivos...', 'info');
 
-    const motivosDoc = await DB.collection('config').doc('motivos').get();
-    const listaMotivos = motivosDoc.exists ? (motivosDoc.data().lista || []) : [];
-    log(`Firebase: ${listaMotivos.length} motivos encontrados`);
+    const cfgMot = await FB.collection('config').doc('motivos').get();
+    const listaMotivos = cfgMot.exists ? (cfgMot.data().lista || []) : [];
+    log('Firebase: ' + listaMotivos.length + ' motivos');
 
-    const motivoIdMap = {}; // descricao → uuid
-    for (const desc of listaMotivos) {
-      if (!desc || !desc.trim()) continue;
-      const { data, error } = await supa
-        .from('motivos_falha')
-        .upsert({ descricao: desc.trim() }, { onConflict: 'descricao', ignoreDuplicates: false })
-        .select('id, descricao')
-        .single();
-      if (error) {
-        const { data: existing } = await supa.from('motivos_falha').select('id,descricao').eq('descricao', desc.trim()).single();
-        if (existing) motivoIdMap[desc.trim()] = existing.id;
-        log(`Motivo já existe: ${desc}`, 'warn');
-      } else {
-        motivoIdMap[desc.trim()] = data.id;
-        totais.motivos++;
-        log(`✓ Motivo inserido: ${desc}`, 'ok');
-      }
-    }
+    const rowsMot = listaMotivos
+      .map(d => d && d.trim())
+      .filter(Boolean)
+      .map(descricao => ({ descricao }));
 
-    // Garante todos os IDs
-    const { data: allMotivos } = await supa.from('motivos_falha').select('id, descricao');
-    (allMotivos || []).forEach(m => { motivoIdMap[m.descricao] = m.id; });
+    const insertedMot = await sbUpsert('motivos_falha', rowsMot, 'descricao');
+    log('Supabase: ' + insertedMot.length + ' inseridos', 'ok');
 
-    setStep('motivos', 'ok', `${Object.keys(motivoIdMap).length} motivos`);
-    document.getElementById('r-motivos').textContent = Object.keys(motivoIdMap).length;
+    const { data: allMot } = await SB.from('motivos_falha').select('id,descricao');
+    const motivoMap = {};
+    (allMot || []).forEach(m => { motivoMap[m.descricao] = m.id; });
+    step(2, 'ok', Object.keys(motivoMap).length + ' motivos');
+    document.getElementById('r2').textContent = Object.keys(motivoMap).length;
 
-    // ════════════════════════════════════════
-    // PASSO 3 — SITES (base_sites)
-    // ════════════════════════════════════════
-    log('Buscando Sites no Firebase...', 'info');
-    setStep('sites', 'run');
+    // ══════════════════════════════════════
+    // 3 · Sites
+    // ══════════════════════════════════════
+    step(3, 'run', 'lendo Firebase...');
+    log('Buscando Sites...', 'info');
 
-    const sitesSnap = await DB.collection('base_sites').get();
-    log(`Firebase: ${sitesSnap.size} sites encontrados`);
+    const sitesSnap = await FB.collection('base_sites').get();
+    log('Firebase: ' + sitesSnap.size + ' sites');
 
-    const siteIdMap = {}; // sbs (número) → uuid Supabase
-    let sitesInseridos = 0;
-    let loteSites = [];
-
+    const sbsParaNome = {}; // sbs → nome (para mapear ocorrências)
+    const rowsSites = [];
     sitesSnap.forEach(doc => {
       const s = doc.data();
-      const rispId = rispIdMap[s.risp?.trim()] || null;
-      loteSites.push({
-        nome:      (s.nome || `Site ${s.sbs}`).trim(),
-        risp_id:   rispId,
-        latitude:  s.lat  ? parseFloat(s.lat)  : null,
-        longitude: s.lon  ? parseFloat(s.lon)  : null,
+      const nome = (s.nome || ('Site ' + s.sbs)).trim();
+      sbsParaNome[String(s.sbs)] = nome;
+      rowsSites.push({
+        nome,
+        risp_id:   rispMap[s.risp ? s.risp.trim() : ''] || null,
+        latitude:  s.lat ? parseFloat(s.lat) : null,
+        longitude: s.lon ? parseFloat(s.lon) : null,
         ativo:     true,
-        observacoes: [
-          s.cidade ? `Cidade: ${s.cidade}` : null,
-          s.cr     ? `CR: ${s.cr}`         : null,
-          s.trafego ? `Tráfego: ${s.trafego}` : null,
-          s.prop   ? `Prop: ${s.prop}`     : null,
-          `SBS: ${s.sbs}`
-        ].filter(Boolean).join(' | '),
-        _sbs: s.sbs // campo temporário para mapear IDs
+        observacoes: ['SBS: ' + s.sbs, s.cidade && 'Cidade: ' + s.cidade, s.cr && 'CR: ' + s.cr, s.trafego && 'Tráfego: ' + s.trafego, s.prop && 'Prop: ' + s.prop].filter(Boolean).join(' | ')
       });
     });
 
-    // Insere em lotes de 50
-    for (let i = 0; i < loteSites.length; i += 50) {
-      const lote = loteSites.slice(i, i + 50).map(({ _sbs, ...rest }) => rest);
-      const { data: inserted, error } = await supa
-        .from('sites')
-        .upsert(lote, { onConflict: 'nome', ignoreDuplicates: true })
-        .select('id, nome, observacoes');
-      if (error) {
-        log(`Erro ao inserir lote de sites: ${error.message}`, 'err');
-      } else {
-        sitesInseridos += (inserted || []).length;
-        log(`✓ Lote ${Math.floor(i/50)+1}: ${(inserted||[]).length} sites inseridos`, 'ok');
-      }
+    // Lotes de 50
+    let sitesOk = 0;
+    for (let i = 0; i < rowsSites.length; i += 50) {
+      const lote = rowsSites.slice(i, i + 50);
+      const ins  = await sbUpsert('sites', lote, 'nome');
+      sitesOk += ins.length;
+      log('Lote sites ' + (Math.floor(i/50)+1) + ': ' + ins.length + ' inseridos', 'ok');
     }
 
-    // Busca todos os IDs de sites (para mapear com ocorrências)
-    const { data: allSites } = await supa.from('sites').select('id, nome, observacoes');
+    // Mapa nome→id
+    const { data: allSites } = await SB.from('sites').select('id,nome,observacoes');
+    const siteMap = {}; // nome → id
+    const sbsMap  = {}; // sbs  → id
     (allSites || []).forEach(s => {
-      // Tenta extrair SBS das observações
-      const sbsMatch = s.observacoes?.match(/SBS:\s*(\d+)/);
-      if (sbsMatch) siteIdMap[sbsMatch[1]] = s.id;
-      siteIdMap[s.nome] = s.id; // também por nome
+      siteMap[s.nome] = s.id;
+      const m = s.observacoes && s.observacoes.match(/SBS:\s*(\S+)/);
+      if (m) sbsMap[m[1]] = s.id;
+    });
+    // Garante via sbsParaNome
+    Object.entries(sbsParaNome).forEach(([sbs, nome]) => {
+      if (!sbsMap[sbs] && siteMap[nome]) sbsMap[sbs] = siteMap[nome];
     });
 
-    // Reconstrói mapa SBS a partir dos dados originais
-    lotesSites: for (const s of lotesSites || lotesSitesRef || []) {}
-    // Método alternativo: reconstrói via nome
-    sitesSnap.forEach(doc => {
-      const s = doc.data();
-      const nome = (s.nome || `Site ${s.sbs}`).trim();
-      const id   = siteIdMap[nome];
-      if (id) siteIdMap[String(s.sbs)] = id;
-    });
+    step(3, 'ok', (allSites || []).length + ' sites');
+    document.getElementById('r3').textContent = (allSites || []).length;
 
-    setStep('sites', 'ok', `${allSites?.length || 0} sites`);
-    document.getElementById('r-sites').textContent = allSites?.length || 0;
-    totais.sites = sitesInseridos;
+    // ══════════════════════════════════════
+    // 4 · Ocorrências
+    // ══════════════════════════════════════
+    step(4, 'run', 'lendo Firebase...');
+    log('Buscando Registros/Ocorrências...', 'info');
 
-    // ════════════════════════════════════════
-    // PASSO 4 — OCORRÊNCIAS (registros)
-    // ════════════════════════════════════════
-    log('Buscando Ocorrências no Firebase...', 'info');
-    setStep('ocorrs', 'run');
+    const regsSnap = await FB.collection('registros').get();
+    log('Firebase: ' + regsSnap.size + ' registros');
 
-    const registrosSnap = await DB.collection('registros').get();
-    log(`Firebase: ${registrosSnap.size} registros encontrados`);
-
-    let ocorrsInseridas = 0;
-    let ocorrsIgnoradas = 0;
-    const loteOcorrs = [];
-
-    registrosSnap.forEach(doc => {
+    const rowsOc  = [];
+    let ignorados = 0;
+    regsSnap.forEach(doc => {
       const r = doc.data();
+      const siteId = sbsMap[String(r.sbs)];
+      if (!siteId) { ignorados++; return; }
 
-      // Resolve site_id
-      const siteId = siteIdMap[String(r.sbs)] || null;
-      if (!siteId) {
-        log(`⚠ SBS ${r.sbs} não encontrado — ocorrência ${r.id} ignorada`, 'warn');
-        ocorrsIgnoradas++;
-        return;
-      }
+      const sit      = mapSit(r.situacao);
+      const motivoId = motivoMap[r.motivo] || null;
+      const obs      = [r.obs, r.acao, r.operador && ('Op: ' + r.operador), r.prazo && ('Prazo: ' + r.prazo)].filter(Boolean).join('\n') || null;
 
-      // Resolve motivo_id (busca por texto)
-      const motivoTexto = (r.motivo || '').trim();
-      let motivoId = motivoIdMap[motivoTexto] || null;
-      // Tenta match parcial
-      if (!motivoId && motivoTexto) {
-        const match = Object.keys(motivoIdMap).find(k => k.toLowerCase().includes(motivoTexto.toLowerCase()) || motivoTexto.toLowerCase().includes(k.toLowerCase()));
-        if (match) motivoId = motivoIdMap[match];
-      }
-      // Se motivo não existe, cria
-      if (!motivoId && motivoTexto && motivoTexto !== 'Informado via mapa') {
-        log(`  Motivo novo detectado: "${motivoTexto}" — será adicionado`, 'info');
-      }
-
-      const situacao   = mapSituacao(r.situacao);
-      const inicio     = toISODate(r.inicio || r.ts);
-      const fim        = situacao === 'Operacional' ? toISODate(r.ts) : null;
-
-      loteOcorrs.push({
-        site_id:     siteId,
-        situacao:    situacao,
-        motivo_id:   motivoId,
-        inicio:      inicio,
-        fim:         fim,
-        os_numero:   r.os || null,
-        observacoes: [r.obs, r.acao, r.operador ? `Op: ${r.operador}` : null, r.prazo ? `Prazo: ${r.prazo}` : null].filter(Boolean).join('\n') || null,
+      rowsOc.push({
+        site_id:   siteId,
+        situacao:  sit,
+        motivo_id: motivoId,
+        inicio:    toISO(r.inicio || r.ts),
+        fim:       sit === 'Operacional' ? toISO(r.ts) : null,
+        os_numero: r.os || null,
+        observacoes: obs,
       });
     });
 
-    // Insere em lotes de 50
-    for (let i = 0; i < loteOcorrs.length; i += 50) {
-      const lote = loteOcorrs.slice(i, i + 50);
-      const { data: inserted, error } = await supa.from('ocorrencias').insert(lote).select('id');
+    if (ignorados) log('⚠ ' + ignorados + ' registros sem site mapeado — ignorados', 'warn');
+
+    let ocorrsOk = 0;
+    for (let i = 0; i < rowsOc.length; i += 50) {
+      const lote = rowsOc.slice(i, i + 50);
+      const { data: ins, error } = await SB.from('ocorrencias').insert(lote).select('id');
       if (error) {
-        log(`Erro ao inserir lote de ocorrências (${i}–${i+50}): ${error.message}`, 'err');
+        log('Erro lote ocorrências ' + (Math.floor(i/50)+1) + ': ' + error.message, 'err');
       } else {
-        ocorrsInseridas += (inserted || []).length;
-        log(`✓ Lote ${Math.floor(i/50)+1}: ${(inserted||[]).length} ocorrências inseridas`, 'ok');
+        ocorrsOk += (ins || []).length;
+        log('Lote ocorrências ' + (Math.floor(i/50)+1) + ': ' + (ins||[]).length + ' inseridas', 'ok');
       }
     }
 
-    setStep('ocorrs', 'ok', `${ocorrsInseridas} inseridas${ocorrsIgnoradas ? `, ${ocorrsIgnoradas} ignoradas` : ''}`);
-    document.getElementById('r-ocorrs').textContent = ocorrsInseridas;
+    step(4, 'ok', ocorrsOk + ' ocorrências');
+    document.getElementById('r4').textContent = ocorrsOk;
 
-    // ════════════════════════════════════════
-    // CONCLUÍDO
-    // ════════════════════════════════════════
-    log('', '');
-    log('══════════════════════════════════════', 'ok');
-    log('✅ MIGRAÇÃO CONCLUÍDA COM SUCESSO!', 'ok');
-    log(`   RISPs:        ${Object.keys(rispIdMap).length}`, 'ok');
-    log(`   Motivos:      ${Object.keys(motivoIdMap).length}`, 'ok');
-    log(`   Sites:        ${allSites?.length || 0}`, 'ok');
-    log(`   Ocorrências:  ${ocorrsInseridas} inseridas`, 'ok');
-    if (ocorrsIgnoradas) log(`   ⚠ Ignoradas:   ${ocorrsIgnoradas} (SBS não mapeado)`, 'warn');
-    log('══════════════════════════════════════', 'ok');
+    // ══════════════════════════════════════
+    // FIM
+    // ══════════════════════════════════════
+    log('', 'dim');
+    log('══════════════════════════════════', 'ok');
+    log('✅ MIGRAÇÃO CONCLUÍDA!', 'ok');
+    log('RISPs: '      + Object.keys(rispMap).length, 'ok');
+    log('Motivos: '    + Object.keys(motivoMap).length, 'ok');
+    log('Sites: '      + (allSites||[]).length, 'ok');
+    log('Ocorrências: '+ ocorrsOk, 'ok');
+    log('══════════════════════════════════', 'ok');
 
     document.getElementById('resultado').style.display = 'block';
     btn.textContent = '✅ Concluído';
 
   } catch (err) {
-    log(`ERRO CRÍTICO: ${err.message}`, 'err');
+    log('ERRO: ' + err.message, 'err');
     console.error(err);
     btn.disabled    = false;
     btn.textContent = '▶ Tentar novamente';
   }
 }
-
-// Variável de controle para evitar erro de referência
-const lotesSites    = null;
-const lotesSitesRef = null;
 </script>
 </body>
 </html>
