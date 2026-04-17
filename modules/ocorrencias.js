@@ -1,10 +1,20 @@
 // ═══════════════════════════════════════
 // GRAD Ecossistema — OCORRÊNCIAS
+// Versão completa com todos os campos
 // ═══════════════════════════════════════
+//
+// SQL necessário no Supabase (executar uma vez):
+// ALTER TABLE ocorrencias
+//   ADD COLUMN IF NOT EXISTS prazo DATE,
+//   ADD COLUMN IF NOT EXISTS glpi VARCHAR,
+//   ADD COLUMN IF NOT EXISTS consideracoes TEXT,
+//   ADD COLUMN IF NOT EXISTS acao TEXT,
+//   ADD COLUMN IF NOT EXISTS conclusao TIMESTAMPTZ,
+//   ADD COLUMN IF NOT EXISTS operador VARCHAR;
 
 const Ocorrencias = {
   _data: [],
-  _filtros: { situacao: '', risp: '', motivo: '', busca: '' },
+  _filtros: { situacao: '', risp: '', motivo: '', busca: '', proprietario: '' },
   _pagina: 1,
   _porPagina: 20,
 
@@ -22,12 +32,13 @@ const Ocorrencias = {
           </div>
         </div>
 
-        <!-- Filtros -->
+        <!-- Filtros principais -->
         <div class="filter-bar">
           <input class="form-input" id="oc-busca" placeholder="Buscar site..." oninput="Ocorrencias._applyFilter()" style="width:200px">
           <select class="form-select" id="oc-sit" onchange="Ocorrencias._applyFilter()" style="width:170px">
             <option value="">Todas situações</option>
             <option>Inoperante</option>
+            <option>Instável</option>
             <option>Parcial/Em analise</option>
             <option>Modo Local</option>
           </select>
@@ -37,7 +48,13 @@ const Ocorrencias = {
           <select class="form-select" id="oc-mot" onchange="Ocorrencias._applyFilter()" style="width:200px">
             <option value="">Todos motivos</option>
           </select>
+          <select class="form-select" id="oc-prop" onchange="Ocorrencias._applyFilter()" style="width:150px">
+            <option value="">Proprietário</option>
+          </select>
         </div>
+
+        <!-- Chips rápidos de motivos -->
+        <div id="oc-motivo-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
 
         <!-- Resumo rápido -->
         <div id="oc-summary" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"></div>
@@ -61,17 +78,15 @@ const Ocorrencias = {
 
   async load() {
     try {
-      // Carrega ocorrências ativas
       const data = await dbQuery(d =>
         d.from('ocorrencias')
-          .select('*, site:sites(id,nome,risp:risps(id,nome)), motivo:motivos_falha(id,descricao)')
+          .select('*, site:sites(id,nome,cidade,proprietario,risp:risps(id,nome)), motivo:motivos_falha(id,descricao)')
           .neq('situacao', 'Operacional')
           .order('inicio', { ascending: false })
       );
       Ocorrencias._data = data || [];
-
-      // Popula filtros
       await Ocorrencias._popularFiltros();
+      Ocorrencias._renderChips();
       Ocorrencias._applyFilter();
     } catch {
       document.getElementById('oc-table-wrap').innerHTML =
@@ -105,6 +120,54 @@ const Ocorrencias = {
         });
       }
     } catch {}
+
+    // Proprietários (dos sites nas ocorrências ativas)
+    try {
+      const props = [...new Set(Ocorrencias._data
+        .map(o => o.site?.proprietario)
+        .filter(Boolean)
+      )].sort();
+      const sel = document.getElementById('oc-prop');
+      if (sel && props.length) {
+        props.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p; o.textContent = p;
+          sel.appendChild(o);
+        });
+      }
+    } catch {}
+  },
+
+  _renderChips() {
+    // Chips rápidos com contagem por motivo
+    const motivoMap = {};
+    Ocorrencias._data.forEach(o => {
+      const m = o.motivo?.descricao || 'Sem motivo';
+      motivoMap[m] = (motivoMap[m] || 0) + 1;
+    });
+
+    const chipsEl = document.getElementById('oc-motivo-chips');
+    if (!chipsEl) return;
+
+    const topMotivos = Object.entries(motivoMap)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, 8);
+
+    if (!topMotivos.length) { chipsEl.innerHTML = ''; return; }
+
+    chipsEl.innerHTML = `
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);align-self:center">FILTRAR:</span>
+      <span class="badge badge-gray" style="cursor:pointer" onclick="Ocorrencias._filtrarMotivo('')">Todos</span>
+      ${topMotivos.map(([m, c]) => `
+        <span class="badge badge-blue" style="cursor:pointer" onclick="Ocorrencias._filtrarMotivo('${m.replace(/'/g,"\\'")}')">
+          ${m} <span style="opacity:.7">(${c})</span>
+        </span>`).join('')}`;
+  },
+
+  _filtrarMotivo(motivo) {
+    const sel = document.getElementById('oc-mot');
+    if (sel) sel.value = motivo;
+    Ocorrencias._applyFilter();
   },
 
   _applyFilter() {
@@ -112,19 +175,22 @@ const Ocorrencias = {
     const sit    = document.getElementById('oc-sit')?.value || '';
     const risp   = document.getElementById('oc-risp')?.value || '';
     const motivo = document.getElementById('oc-mot')?.value || '';
+    const prop   = document.getElementById('oc-prop')?.value || '';
 
-    Ocorrencias._filtros = { busca, situacao: sit, risp, motivo };
+    Ocorrencias._filtros = { busca, situacao: sit, risp, motivo, proprietario: prop };
     Ocorrencias._pagina  = 1;
     Ocorrencias._render();
   },
 
   _filtrar() {
-    const { busca, situacao, risp, motivo } = Ocorrencias._filtros;
+    const { busca, situacao, risp, motivo, proprietario } = Ocorrencias._filtros;
     return Ocorrencias._data.filter(o => {
-      if (situacao && o.situacao !== situacao) return false;
-      if (risp     && o.site?.risp?.nome !== risp) return false;
-      if (motivo   && o.motivo?.descricao !== motivo) return false;
-      if (busca    && !o.site?.nome?.toLowerCase().includes(busca)) return false;
+      if (situacao    && o.situacao !== situacao) return false;
+      if (risp        && o.site?.risp?.nome !== risp) return false;
+      if (motivo      && o.motivo?.descricao !== motivo) return false;
+      if (proprietario && o.site?.proprietario !== proprietario) return false;
+      if (busca       && !o.site?.nome?.toLowerCase().includes(busca) &&
+                         !o.site?.cidade?.toLowerCase().includes(busca)) return false;
       return true;
     });
   },
@@ -136,37 +202,48 @@ const Ocorrencias = {
     const pagina    = filtrados.slice(inicio, inicio + Ocorrencias._porPagina);
 
     // Resumo
-    const inop = filtrados.filter(o => o.situacao === 'Inoperante').length;
-    const parc = filtrados.filter(o => o.situacao === 'Parcial/Em analise').length;
-    const ml   = filtrados.filter(o => o.situacao === 'Modo Local').length;
-    const crit = filtrados.filter(o => o.situacao === 'Inoperante' && diffDays(o.inicio) > 7).length;
+    const inop  = filtrados.filter(o => o.situacao === 'Inoperante').length;
+    const inst  = filtrados.filter(o => o.situacao === 'Instável').length;
+    const parc  = filtrados.filter(o => o.situacao === 'Parcial/Em analise').length;
+    const ml    = filtrados.filter(o => o.situacao === 'Modo Local').length;
+    const crit  = filtrados.filter(o => o.situacao === 'Inoperante' && diffDays(o.inicio) > 7).length;
 
     const sumEl = document.getElementById('oc-summary');
     if (sumEl) sumEl.innerHTML = `
       <span class="badge badge-red">${inop} Inoperantes</span>
+      ${inst ? `<span class="badge badge-teal">${inst} Instáveis</span>` : ''}
       <span class="badge badge-amber">${parc} Parcial/Análise</span>
       <span class="badge badge-purple">${ml} Modo Local</span>
       <span class="badge badge-gray">${crit} Críticos +7d</span>
-      <span class="badge badge-blue">${total} no filtro</span>`;
+      <span class="badge badge-blue" style="margin-left:auto">${total} no filtro</span>`;
 
     // Tabela
     const rows = pagina.map(o => {
-      const dias = diffDays(o.inicio);
+      const dias  = diffDays(o.inicio);
       const badge = Ocorrencias._situacaoBadge(o.situacao);
+      const prazoFlag = o.prazo
+        ? (new Date(o.prazo) < new Date()
+          ? `<span class="days-chip crit" title="Prazo vencido">${formatDate(o.prazo)}</span>`
+          : `<span style="font-size:11px;color:var(--text3)">${formatDate(o.prazo)}</span>`)
+        : '<span style="color:var(--text3);font-size:11px">—</span>';
+
       return `
         <tr onclick="Ocorrencias.verDetalhes('${o.id}')" style="cursor:pointer">
           <td><span class="risp-badge">${o.site?.risp?.nome || '—'}</span></td>
-          <td><strong style="color:var(--text)">${o.site?.nome || o.site_id}</strong></td>
+          <td>
+            <strong style="color:var(--text)">${o.site?.nome || o.site_id}</strong>
+            ${o.site?.cidade ? `<div style="font-size:10px;color:var(--text3)">${o.site.cidade}</div>` : ''}
+          </td>
           <td>${badge}</td>
           <td style="color:var(--text2);font-size:12px">${o.motivo?.descricao || '—'}</td>
           <td>${daysBadge(dias)}</td>
           <td style="color:var(--text3);font-size:12px">${formatDate(o.inicio)}</td>
-          <td style="color:var(--text3);font-size:12px">${o.os_numero || '—'}</td>
+          <td>${prazoFlag}</td>
+          <td style="color:var(--text3);font-size:12px">${o.glpi || '—'}</td>
           <td>
-            <div style="display:flex;gap:4px">
-              <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();Ocorrencias.verDetalhes('${o.id}')">Ver</button>
-              <button class="btn btn-ghost btn-sm perm-edit" onclick="event.stopPropagation();Ocorrencias.editar('${o.id}')">✎</button>
-              <button class="btn btn-ghost btn-sm perm-edit" onclick="event.stopPropagation();Ocorrencias.fechar('${o.id}')">✔ Fechar</button>
+            <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+              <button class="btn btn-ghost btn-sm perm-edit" title="Editar" onclick="Ocorrencias.editar('${o.id}')">✎</button>
+              <button class="btn btn-success btn-sm perm-edit" title="Dar baixa" onclick="Ocorrencias.darBaixa('${o.id}')">✔ Baixa</button>
             </div>
           </td>
         </tr>`;
@@ -176,8 +253,8 @@ const Ocorrencias = {
       <table>
         <thead>
           <tr>
-            <th>RISP</th><th>Site</th><th>Situação</th><th>Motivo</th>
-            <th>Dias</th><th>Início</th><th>OS</th><th>Ações</th>
+            <th>RISP</th><th>Site / Município</th><th>Situação</th><th>Motivo</th>
+            <th>Dias</th><th>Início</th><th>Prazo</th><th>GLPI</th><th>Ações</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -214,6 +291,7 @@ const Ocorrencias = {
   _situacaoBadge(sit) {
     const map = {
       'Inoperante':          'badge-red',
+      'Instável':            'badge-teal',
       'Parcial/Em analise':  'badge-amber',
       'Modo Local':          'badge-purple',
       'Operacional':         'badge-green',
@@ -223,7 +301,6 @@ const Ocorrencias = {
 
   // ── NOVA OCORRÊNCIA ──────────────────
   async abrirNova() {
-    // Carrega selects
     let sitesOpts  = '<option value="">Selecione um site...</option>';
     let motivoOpts = '<option value="">Selecione o motivo...</option>';
     try {
@@ -234,7 +311,7 @@ const Ocorrencias = {
     } catch {}
 
     Modal.open('Nova Ocorrência', `
-      <div class="form-grid-2">
+      <div class="form-grid form-grid-2">
         <div style="grid-column:1/-1">
           <label class="form-label">Site *</label>
           <select class="form-select" id="noc-site">${sitesOpts}</select>
@@ -243,12 +320,13 @@ const Ocorrencias = {
           <label class="form-label">Situação *</label>
           <select class="form-select" id="noc-sit">
             <option>Inoperante</option>
+            <option>Instável</option>
             <option>Parcial/Em analise</option>
             <option>Modo Local</option>
           </select>
         </div>
         <div>
-          <label class="form-label">Motivo *</label>
+          <label class="form-label">Motivo</label>
           <select class="form-select" id="noc-mot">${motivoOpts}</select>
         </div>
         <div>
@@ -256,12 +334,24 @@ const Ocorrencias = {
           <input type="datetime-local" class="form-input" id="noc-inicio" value="${new Date().toISOString().slice(0,16)}">
         </div>
         <div>
-          <label class="form-label">Nº da OS</label>
-          <input type="text" class="form-input" id="noc-os" placeholder="OS-0000">
+          <label class="form-label">Prazo de resolução</label>
+          <input type="date" class="form-input" id="noc-prazo">
+        </div>
+        <div>
+          <label class="form-label">GLPI / Protocolo</label>
+          <input type="text" class="form-input" id="noc-glpi" placeholder="Ex: #12345">
+        </div>
+        <div>
+          <label class="form-label">Operador</label>
+          <input type="text" class="form-input" id="noc-operador" placeholder="Nome do técnico">
         </div>
         <div style="grid-column:1/-1">
           <label class="form-label">Observações</label>
-          <textarea class="form-textarea" id="noc-obs" rows="3" placeholder="Detalhes da ocorrência..."></textarea>
+          <textarea class="form-textarea" id="noc-obs" rows="2" placeholder="Detalhes da ocorrência..."></textarea>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label">Ação tomada</label>
+          <textarea class="form-textarea" id="noc-acao" rows="2" placeholder="Ações em andamento..."></textarea>
         </div>
       </div>`,
       [
@@ -276,8 +366,11 @@ const Ocorrencias = {
     const situacao  = document.getElementById('noc-sit')?.value;
     const motivo_id = document.getElementById('noc-mot')?.value || null;
     const inicio    = document.getElementById('noc-inicio')?.value;
-    const os_numero = document.getElementById('noc-os')?.value?.trim() || null;
+    const prazo     = document.getElementById('noc-prazo')?.value || null;
+    const glpi      = document.getElementById('noc-glpi')?.value?.trim() || null;
+    const operador  = document.getElementById('noc-operador')?.value?.trim() || null;
     const obs       = document.getElementById('noc-obs')?.value?.trim() || null;
+    const acao      = document.getElementById('noc-acao')?.value?.trim() || null;
 
     if (!site_id || !situacao || !inicio) {
       Toast.show('Preencha os campos obrigatórios', 'error'); return;
@@ -285,8 +378,8 @@ const Ocorrencias = {
 
     try {
       const { data, error } = await db.from('ocorrencias').insert({
-        site_id, situacao, motivo_id, inicio,
-        os_numero, observacoes: obs,
+        site_id, situacao, motivo_id, inicio, prazo, glpi, operador,
+        observacoes: obs, acao,
         criado_por: Auth.user?.id
       }).select().single();
       if (error) throw error;
@@ -294,6 +387,7 @@ const Ocorrencias = {
       Modal.close();
       Toast.show('Ocorrência registrada com sucesso', 'success');
       await Ocorrencias.load();
+      App._updateAlertBadge && App._updateAlertBadge();
     } catch (err) {
       Toast.show(err.message || 'Erro ao registrar', 'error');
     }
@@ -308,24 +402,32 @@ const Ocorrencias = {
     const badge = Ocorrencias._situacaoBadge(o.situacao);
 
     Modal.open(`Ocorrência — ${o.site?.nome || id}`, `
-      <div style="display:grid;gap:12px">
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div><label class="form-label">RISP</label><div>${o.site?.risp?.nome||'—'}</div></div>
-          <div><label class="form-label">Site</label><div><strong>${o.site?.nome||'—'}</strong></div></div>
-          <div><label class="form-label">Situação</label><div>${badge}</div></div>
-          <div><label class="form-label">Dias</label><div>${daysBadge(dias)}</div></div>
+      <div style="display:grid;gap:14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          ${badge}
+          ${o.motivo?.descricao ? `<span class="badge badge-gray">${o.motivo.descricao}</span>` : ''}
+          ${daysBadge(dias)}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div><label class="form-label">Motivo</label><div style="color:var(--text2)">${o.motivo?.descricao||'—'}</div></div>
-          <div><label class="form-label">OS</label><div style="color:var(--text2)">${o.os_numero||'—'}</div></div>
+          <div><label class="form-label">RISP</label><div>${o.site?.risp?.nome||'—'}</div></div>
+          <div><label class="form-label">Município</label><div>${o.site?.cidade||'—'}</div></div>
           <div><label class="form-label">Início</label><div style="color:var(--text2)">${formatDateTime(o.inicio)}</div></div>
-          <div><label class="form-label">Previsão</label><div style="color:var(--text2)">${formatDate(o.previsao_retorno)||'—'}</div></div>
+          <div><label class="form-label">Prazo</label><div style="color:${o.prazo&&new Date(o.prazo)<new Date()?'#f87171':'var(--text2)'}">
+            ${o.prazo ? formatDate(o.prazo) : '—'}
+          </div></div>
+          <div><label class="form-label">GLPI / Protocolo</label><div style="color:var(--accent2)">${o.glpi||'—'}</div></div>
+          <div><label class="form-label">Operador</label><div style="color:var(--text2)">${o.operador||'—'}</div></div>
+          <div><label class="form-label">Proprietário</label><div style="color:var(--text2)">${o.site?.proprietario||'—'}</div></div>
+          <div><label class="form-label">OS</label><div style="color:var(--text2)">${o.os_numero||'—'}</div></div>
         </div>
-        ${o.observacoes ? `<div><label class="form-label">Observações</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap">${o.observacoes}</div></div>` : ''}
+        ${o.observacoes ? `<div><label class="form-label">Observações</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap;background:rgba(255,255,255,.03);padding:8px;border-radius:6px">${o.observacoes}</div></div>` : ''}
+        ${o.acao ? `<div><label class="form-label">Ação tomada</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap;background:rgba(255,255,255,.03);padding:8px;border-radius:6px">${o.acao}</div></div>` : ''}
+        ${o.consideracoes ? `<div><label class="form-label">Considerações</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap;background:rgba(255,255,255,.03);padding:8px;border-radius:6px">${o.consideracoes}</div></div>` : ''}
       </div>`,
       [
-        { label: 'Fechar', class: 'btn-ghost', onclick: 'Modal.close()' },
-        { label: '✎ Editar', class: 'btn-primary perm-edit', onclick: `Modal.close();Ocorrencias.editar('${id}')` }
+        { label: 'Fechar',    class: 'btn-ghost',   onclick: 'Modal.close()' },
+        { label: '✎ Editar',  class: 'btn-primary perm-edit', onclick: `Modal.close();Ocorrencias.editar('${id}')` },
+        { label: '✔ Dar Baixa', class: 'btn-success perm-edit', onclick: `Modal.close();Ocorrencias.darBaixa('${id}')` }
       ]
     );
   },
@@ -344,12 +446,12 @@ const Ocorrencias = {
       motivoOpts = '<option value="">—</option>' + (motivos||[]).map(m=>`<option value="${m.id}" ${m.id===o.motivo_id?'selected':''}>${m.descricao}</option>`).join('');
     } catch {}
 
-    const situacoes = ['Inoperante','Parcial/Em analise','Modo Local'];
+    const situacoes = ['Inoperante','Instável','Parcial/Em analise','Modo Local'];
     const sitOpts   = situacoes.map(s=>`<option ${s===o.situacao?'selected':''}>${s}</option>`).join('');
-    const prevVal   = o.previsao_retorno ? new Date(o.previsao_retorno).toISOString().slice(0,16) : '';
+    const prazoVal  = o.prazo ? new Date(o.prazo).toISOString().slice(0,10) : '';
 
     Modal.open('Editar Ocorrência', `
-      <div class="form-grid-2">
+      <div class="form-grid form-grid-2">
         <div style="grid-column:1/-1">
           <label class="form-label">Site</label>
           <select class="form-select" id="eoc-site">${sitesOpts}</select>
@@ -367,16 +469,28 @@ const Ocorrencias = {
           <input type="datetime-local" class="form-input" id="eoc-inicio" value="${o.inicio?new Date(o.inicio).toISOString().slice(0,16):''}">
         </div>
         <div>
-          <label class="form-label">Previsão de retorno</label>
-          <input type="datetime-local" class="form-input" id="eoc-prev" value="${prevVal}">
+          <label class="form-label">Prazo de resolução</label>
+          <input type="date" class="form-input" id="eoc-prazo" value="${prazoVal}">
         </div>
         <div>
-          <label class="form-label">Nº da OS</label>
-          <input type="text" class="form-input" id="eoc-os" value="${o.os_numero||''}">
+          <label class="form-label">GLPI / Protocolo</label>
+          <input type="text" class="form-input" id="eoc-glpi" value="${o.glpi||''}">
+        </div>
+        <div>
+          <label class="form-label">Operador</label>
+          <input type="text" class="form-input" id="eoc-operador" value="${o.operador||''}">
         </div>
         <div style="grid-column:1/-1">
           <label class="form-label">Observações</label>
-          <textarea class="form-textarea" id="eoc-obs" rows="3">${o.observacoes||''}</textarea>
+          <textarea class="form-textarea" id="eoc-obs" rows="2">${o.observacoes||''}</textarea>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label">Ação tomada</label>
+          <textarea class="form-textarea" id="eoc-acao" rows="2">${o.acao||''}</textarea>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label">Considerações</label>
+          <textarea class="form-textarea" id="eoc-cons" rows="2">${o.consideracoes||''}</textarea>
         </div>
       </div>`,
       [
@@ -389,13 +503,16 @@ const Ocorrencias = {
   async salvarEdicao(id) {
     const antes = Ocorrencias._data.find(x => x.id === id);
     const payload = {
-      site_id:           document.getElementById('eoc-site')?.value,
-      situacao:          document.getElementById('eoc-sit')?.value,
-      motivo_id:         document.getElementById('eoc-mot')?.value || null,
-      inicio:            document.getElementById('eoc-inicio')?.value || null,
-      previsao_retorno:  document.getElementById('eoc-prev')?.value || null,
-      os_numero:         document.getElementById('eoc-os')?.value?.trim() || null,
-      observacoes:       document.getElementById('eoc-obs')?.value?.trim() || null,
+      site_id:      document.getElementById('eoc-site')?.value,
+      situacao:     document.getElementById('eoc-sit')?.value,
+      motivo_id:    document.getElementById('eoc-mot')?.value || null,
+      inicio:       document.getElementById('eoc-inicio')?.value || null,
+      prazo:        document.getElementById('eoc-prazo')?.value || null,
+      glpi:         document.getElementById('eoc-glpi')?.value?.trim() || null,
+      operador:     document.getElementById('eoc-operador')?.value?.trim() || null,
+      observacoes:  document.getElementById('eoc-obs')?.value?.trim() || null,
+      acao:         document.getElementById('eoc-acao')?.value?.trim() || null,
+      consideracoes:document.getElementById('eoc-cons')?.value?.trim() || null,
     };
     try {
       const { error } = await db.from('ocorrencias').update(payload).eq('id', id);
@@ -409,37 +526,74 @@ const Ocorrencias = {
     }
   },
 
-  // ── FECHAR OCORRÊNCIA ────────────────
-  async fechar(id) {
+  // ── DAR BAIXA ────────────────────────
+  async darBaixa(id) {
     const o = Ocorrencias._data.find(x => x.id === id);
-    Modal.open('Fechar Ocorrência', `
-      <p style="color:var(--text2)">Site: <strong>${o?.site?.nome||id}</strong></p>
-      <div style="margin-top:12px">
-        <label class="form-label">Observação de encerramento</label>
-        <textarea class="form-textarea" id="foc-obs" rows="3" placeholder="Descreva como foi resolvido..."></textarea>
+    if (!o) return;
+
+    const hoje = new Date().toISOString().slice(0,10);
+
+    Modal.open('Dar Baixa — Encerrar Ocorrência', `
+      <div style="display:grid;gap:12px">
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px">
+          <div style="font-size:13px;color:var(--text2)">Site: <strong style="color:var(--text)">${o?.site?.nome||id}</strong></div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">
+            RISP: ${o?.site?.risp?.nome||'—'} · Motivo: ${o?.motivo?.descricao||'—'} · ${diffDays(o.inicio)} dias
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Data de conclusão *</label>
+          <input type="date" class="form-input" id="bx-conclusao" value="${hoje}">
+        </div>
+        <div>
+          <label class="form-label">Considerações finais *</label>
+          <textarea class="form-textarea" id="bx-cons" rows="3" placeholder="Descreva como o problema foi resolvido..."></textarea>
+        </div>
+        <div>
+          <label class="form-label">Ação final realizada</label>
+          <textarea class="form-textarea" id="bx-acao" rows="2" placeholder="Substituição, reset, configuração..."></textarea>
+        </div>
+        <div>
+          <label class="form-label">Operador que deu baixa</label>
+          <input type="text" class="form-input" id="bx-op" placeholder="Nome do técnico" value="${o.operador||''}">
+        </div>
       </div>`,
       [
-        { label: 'Cancelar', class: 'btn-ghost',   onclick: 'Modal.close()' },
-        { label: '✔ Confirmar fechamento', class: 'btn-primary', onclick: `Ocorrencias.confirmarFechamento('${id}')` }
+        { label: 'Cancelar', class: 'btn-ghost', onclick: 'Modal.close()' },
+        { label: '✔ Confirmar Baixa', class: 'btn-success', onclick: `Ocorrencias.confirmarBaixa('${id}')` }
       ]
     );
   },
 
-  async confirmarFechamento(id) {
-    const obs = document.getElementById('foc-obs')?.value?.trim() || null;
+  async confirmarBaixa(id) {
+    const conclusaoVal = document.getElementById('bx-conclusao')?.value;
+    const consVal      = document.getElementById('bx-cons')?.value?.trim();
+    const acaoVal      = document.getElementById('bx-acao')?.value?.trim() || null;
+    const opVal        = document.getElementById('bx-op')?.value?.trim() || null;
+
+    if (!conclusaoVal) { Toast.show('Informe a data de conclusão', 'error'); return; }
+    if (!consVal)       { Toast.show('Informe as considerações finais (obrigatório)', 'error'); return; }
+
     try {
+      const conclusao = new Date(conclusaoVal).toISOString();
       const { error } = await db.from('ocorrencias').update({
-        situacao: 'Operacional',
-        fim: new Date().toISOString(),
-        observacoes_fechamento: obs
+        situacao:       'Operacional',
+        fim:            new Date().toISOString(),
+        conclusao,
+        consideracoes:  consVal,
+        acao:           acaoVal,
+        operador:       opVal,
       }).eq('id', id);
       if (error) throw error;
-      await Audit.editou('ocorrencias', id, null, { situacao: 'Operacional', fim: new Date().toISOString() });
+      await Audit.editou('ocorrencias', id, null, {
+        situacao: 'Operacional', conclusao, consideracoes: consVal
+      });
       Modal.close();
       Toast.show('Ocorrência encerrada com sucesso', 'success');
       await Ocorrencias.load();
+      App._updateAlertBadge && App._updateAlertBadge();
     } catch (err) {
-      Toast.show(err.message || 'Erro ao fechar', 'error');
+      Toast.show(err.message || 'Erro ao dar baixa', 'error');
     }
   }
 };
