@@ -4,7 +4,10 @@
       "Bash(python3 -c ':*)",
       "Bash(python fix_pdf.py)",
       "Bash(python -c ':*)",
-      "Bash(python fix_charts.py)"
+      "Bash(python fix_charts.py)",
+      "Bash(node --check /c/Users/06413865164/Desktop/grad-ecosistema/.claude/worktrees/thirsty-jennings-11dbd6/modules/equipamentos.js)",
+      "Bash(node --check \"/c/Users/06413865164/Desktop/grad-ecosistema/.claude/worktrees/thirsty-jennings-11dbd6/modules/comunicacoes.js\")",
+      "Bash([ -f \"$BASE/$f\" ])"
     ]
   }
 }
