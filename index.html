@@ -3,43 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRAD — Ecossistema SESP/MT</title>
+<title>GRAD — Ecossistema Inteligente · SESP/MT</title>
 <link rel="stylesheet" href="assets/css/base.css">
 <link rel="stylesheet" href="assets/css/layout.css">
 <link rel="stylesheet" href="assets/css/components.css">
-<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- Libs externas -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 /* ── NAV BADGE ── */
 .nav-badge {
-  display: none;
+  display: inline-flex;
   align-items: center; justify-content: center;
   min-width: 18px; height: 18px;
   padding: 0 4px;
   background: var(--red);
   border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 10px; font-weight: 700;
   font-family: var(--mono);
   color: #fff;
   margin-left: auto;
   flex-shrink: 0;
 }
-.nav-item:hover .nav-badge,
-.nav-item.active .nav-badge {
-  display: inline-flex;
-}
-.nav-badge { display: inline-flex; }
 
-/* ── BADGE TEAL (Instável) ── */
+/* ── BADGE TEAL ── */
 .badge-teal  { background: rgba(20,184,166,.12); color: #14b8a6; border: 1px solid rgba(20,184,166,.25); }
 .kpi-card.teal::after { background: #14b8a6; }
 .kpi-card.teal .kpi-value { color: #14b8a6; }
@@ -54,15 +45,12 @@
   opacity: 0; pointer-events: none;
   transition: opacity .15s;
 }
-#search-overlay.open {
-  opacity: 1; pointer-events: all;
-}
+#search-overlay.open { opacity: 1; pointer-events: all; }
 .search-box {
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 14px;
-  width: 100%;
-  max-width: 600px;
+  width: 100%; max-width: 600px;
   box-shadow: 0 20px 60px rgba(0,0,0,.7);
   overflow: hidden;
 }
@@ -71,51 +59,21 @@
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
 }
-.search-input-wrap svg {
-  width: 18px; height: 18px;
-  stroke: var(--text3); fill: none; stroke-width: 2;
-  flex-shrink: 0;
-}
-#search-input {
-  background: none; border: none; outline: none;
-  font-size: 15px; color: var(--text);
-  font-family: var(--sans); flex: 1;
-}
+.search-input-wrap svg { width: 18px; height: 18px; stroke: var(--text3); fill: none; stroke-width: 2; flex-shrink: 0; }
+#search-input { background: none; border: none; outline: none; font-size: 15px; color: var(--text); font-family: var(--sans); flex: 1; }
 #search-input::placeholder { color: var(--text3); }
-.search-kbd {
-  font-size: 10px; font-family: var(--mono);
-  color: var(--text3);
-  background: rgba(255,255,255,.06);
-  border: 1px solid var(--border);
-  border-radius: 4px; padding: 2px 6px;
-  flex-shrink: 0;
-}
-#search-results {
-  max-height: 380px; overflow-y: auto;
-  padding: 8px;
-}
-.search-result-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background .1s;
-}
-.search-result-item:hover {
-  background: rgba(255,255,255,.06);
-}
+.search-kbd { font-size: 10px; font-family: var(--mono); color: var(--text3); background: rgba(255,255,255,.06); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+#search-results { max-height: 380px; overflow-y: auto; padding: 8px; }
+.search-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .1s; }
+.search-result-item:hover { background: rgba(255,255,255,.06); }
 
-/* ── AO VIVO indicator ── */
-.live-label {
-  font-size: 10px; font-family: var(--mono);
-  color: #34d399; font-weight: 700;
-  letter-spacing: .08em;
-}
+/* ── AO VIVO ── */
+.live-label { font-size: 10px; font-family: var(--mono); color: #34d399; font-weight: 700; letter-spacing: .08em; }
 </style>
 </head>
 <body>
 
-<!-- ══ TELA DE LOGIN ══ -->
+<!-- ══ LOGIN ══ -->
 <div id="login-screen" class="login-screen">
   <div class="login-box">
     <div class="login-logo">
@@ -124,7 +82,7 @@
       </div>
       <div>
         <div class="login-title">GRAD</div>
-        <div class="login-sub">Ecossistema SESP/MT</div>
+        <div class="login-sub">Ecossistema SESP/MT · CIOSP</div>
       </div>
     </div>
     <div class="login-form">
@@ -141,7 +99,7 @@
       <div id="login-error" class="login-error" style="display:none"></div>
       <button class="btn btn-primary btn-full" onclick="Auth.login()">Entrar</button>
     </div>
-    <div class="login-footer">CIOSP — Telecomunicação — GRAD</div>
+    <div class="login-footer">CIOSP — Telecomunicação — GRAD · v2.0</div>
   </div>
 </div>
 
@@ -170,7 +128,7 @@
       </div>
       <div>
         <div class="logo-text">GRAD</div>
-        <div class="logo-sub">Ecossistema SESP/MT</div>
+        <div class="logo-sub">Ecossistema · SESP/MT</div>
       </div>
     </div>
     <div class="topbar-center">
@@ -179,7 +137,6 @@
       <span class="topbar-tag" id="topbar-date"></span>
     </div>
     <div class="topbar-right">
-      <!-- Busca global -->
       <button class="btn btn-ghost btn-sm" onclick="App.openSearch()" title="Busca global (Ctrl+K)">
         <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -193,93 +150,238 @@
 
   <!-- SIDEBAR -->
   <nav class="sidebar">
-    <div class="nav-section-label">Principal</div>
-    <a class="nav-item active" data-page="dashboard" onclick="App.navigate('dashboard')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Dashboard
-    </a>
-    <a class="nav-item" data-page="mapa" onclick="App.navigate('mapa')">
-      <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-      Mapa de ERBs
-    </a>
-    <a class="nav-item" data-page="base" onclick="App.navigate('base')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M12 8v13"/><path d="M5 12H2a10 10 0 0020 0h-3"/></svg>
-      Base de Sites
-    </a>
 
-    <div class="nav-section-label">Ocorrências</div>
-    <a class="nav-item" data-page="alertas" onclick="App.navigate('alertas')">
-      <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      Alertas
-      <span class="nav-badge" id="nav-badge-alertas" style="background:#ef4444">0</span>
-    </a>
-    <a class="nav-item" data-page="ocorrencias" onclick="App.navigate('ocorrencias')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Ocorrências
-      <span class="nav-badge" id="nav-badge-ocorrencias" style="background:#ef4444">0</span>
-    </a>
-    <a class="nav-item" data-page="historico" onclick="App.navigate('historico')">
-      <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
-      Histórico
-    </a>
+    <!-- ══ INFRAESTRUTURA ══ -->
+    <div class="niche-group open" id="niche-infra">
+      <div class="niche-header" onclick="App.toggleNiche('infra')">
+        <span class="niche-icon">📡</span>
+        <span class="niche-label">Infraestrutura</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub active" data-route="infra.dashboard" onclick="App.navigate('infra','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="infra.registros" onclick="App.navigate('infra','registros')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Registros
+          <span class="nav-badge" id="badge-infra-registros" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="infra.historico" onclick="App.navigate('infra','historico')">
+          <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
+          Histórico
+        </a>
+        <a class="nav-item nav-sub" data-route="infra.alertas" onclick="App.navigate('infra','alertas')">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Alertas
+          <span class="nav-badge" id="badge-infra-alertas" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="infra.relatorio" onclick="App.navigate('infra','relatorio')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório
+        </a>
+        <div class="niche-divider"></div>
+        <a class="nav-item nav-sub nav-extra" data-route="infra.mapa" onclick="App.navigate('infra','mapa')">
+          <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          Mapa de ERBs
+        </a>
+        <a class="nav-item nav-sub nav-extra" data-route="infra.base" onclick="App.navigate('infra','base')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M12 8v13"/><path d="M5 12H2a10 10 0 0020 0h-3"/></svg>
+          Base de Sites
+        </a>
+        <a class="nav-item nav-sub nav-extra" data-route="infra.missoes" onclick="App.navigate('infra','missoes')">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Missões
+        </a>
+        <a class="nav-item nav-sub nav-extra" data-route="infra.ordens" onclick="App.navigate('infra','ordens')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Ordens de Serviço
+        </a>
+      </div>
+    </div>
 
-    <div class="nav-section-label">Operacional</div>
-    <a class="nav-item" data-page="missoes" onclick="App.navigate('missoes')">
-      <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      Missões
-    </a>
-    <a class="nav-item" data-page="ordens" onclick="App.navigate('ordens')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Ordens de Serviço
-    </a>
+    <!-- ══ INTELIGÊNCIA / BI ══ -->
+    <div class="niche-group" id="niche-bi">
+      <div class="niche-header" onclick="App.toggleNiche('bi')">
+        <span class="niche-icon">🧠</span>
+        <span class="niche-label">Inteligência / BI</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="bi.dashboard" onclick="App.navigate('bi','dashboard')">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="bi.registros" onclick="App.navigate('bi','registros')">
+          <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Registros
+        </a>
+        <a class="nav-item nav-sub" data-route="bi.historico" onclick="App.navigate('bi','historico')">
+          <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
+          Histórico
+        </a>
+        <a class="nav-item nav-sub" data-route="bi.alertas" onclick="App.navigate('bi','alertas')">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Alertas
+          <span class="nav-badge" id="badge-bi-alertas" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="bi.relatorio" onclick="App.navigate('bi','relatorio')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório
+        </a>
+      </div>
+    </div>
 
-    <div class="nav-section-label">Terminais</div>
-    <a class="nav-item" data-page="issi" onclick="App.navigate('issi')">
-      <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-      ISSI / GSSI
-    </a>
+    <!-- ══ FINANCEIRO / CONTRATOS ══ -->
+    <div class="niche-group" id="niche-financeiro">
+      <div class="niche-header" onclick="App.toggleNiche('financeiro')">
+        <span class="niche-icon">💰</span>
+        <span class="niche-label">Financeiro</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="financeiro.dashboard" onclick="App.navigate('financeiro','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="financeiro.registros" onclick="App.navigate('financeiro','registros')">
+          <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Registros
+          <span class="nav-badge" id="badge-fin-alertas" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="financeiro.historico" onclick="App.navigate('financeiro','historico')">
+          <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
+          Histórico
+        </a>
+        <a class="nav-item nav-sub" data-route="financeiro.alertas" onclick="App.navigate('financeiro','alertas')">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Alertas
+          <span class="nav-badge" id="badge-fin-badge" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="financeiro.relatorio" onclick="App.navigate('financeiro','relatorio')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório
+        </a>
+        <div class="niche-divider"></div>
+        <a class="nav-item nav-sub nav-extra" data-route="financeiro.contratos" onclick="App.navigate('financeiro','contratos')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          Contratos
+        </a>
+      </div>
+    </div>
 
-    <div class="nav-section-label">Análise</div>
-    <a class="nav-item" data-page="inteligencia" onclick="App.navigate('inteligencia')">
-      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Inteligência
-    </a>
-    <a class="nav-item" data-page="relatorio" onclick="App.navigate('relatorio')">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      Relatórios
-    </a>
+    <!-- ══ EQUIPAMENTOS / PATRIMÔNIO ══ -->
+    <div class="niche-group" id="niche-equipamentos">
+      <div class="niche-header" onclick="App.toggleNiche('equipamentos')">
+        <span class="niche-icon">🔧</span>
+        <span class="niche-label">Equipamentos</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="equipamentos.dashboard" onclick="App.navigate('equipamentos','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="equipamentos.registros" onclick="App.navigate('equipamentos','registros')">
+          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Registros
+        </a>
+        <a class="nav-item nav-sub" data-route="equipamentos.historico" onclick="App.navigate('equipamentos','historico')">
+          <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
+          Histórico
+        </a>
+        <a class="nav-item nav-sub" data-route="equipamentos.alertas" onclick="App.navigate('equipamentos','alertas')">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Alertas
+          <span class="nav-badge" id="badge-eq-alertas" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="equipamentos.relatorio" onclick="App.navigate('equipamentos','relatorio')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório
+        </a>
+      </div>
+    </div>
 
+    <!-- ══ COMUNICAÇÕES / RÁDIO ══ -->
+    <div class="niche-group" id="niche-comunicacoes">
+      <div class="niche-header" onclick="App.toggleNiche('comunicacoes')">
+        <span class="niche-icon">📻</span>
+        <span class="niche-label">Comunicações</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="comunicacoes.dashboard" onclick="App.navigate('comunicacoes','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="comunicacoes.registros" onclick="App.navigate('comunicacoes','registros')">
+          <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          Registros
+        </a>
+        <a class="nav-item nav-sub" data-route="comunicacoes.historico" onclick="App.navigate('comunicacoes','historico')">
+          <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 3v5h5"/></svg>
+          Histórico
+        </a>
+        <a class="nav-item nav-sub" data-route="comunicacoes.alertas" onclick="App.navigate('comunicacoes','alertas')">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Alertas
+          <span class="nav-badge" id="badge-com-alertas" style="display:none">0</span>
+        </a>
+        <a class="nav-item nav-sub" data-route="comunicacoes.relatorio" onclick="App.navigate('comunicacoes','relatorio')">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório
+        </a>
+        <div class="niche-divider"></div>
+        <a class="nav-item nav-sub nav-extra" data-route="comunicacoes.issi" onclick="App.navigate('comunicacoes','issi')">
+          <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          ISSI / GSSI
+        </a>
+      </div>
+    </div>
+
+    <!-- ══ SISTEMA (admin) ══ -->
+    <div class="niche-separator"></div>
     <div class="nav-section-label perm-admin">Sistema</div>
-    <a class="nav-item perm-admin" data-page="gerenciar" onclick="App.navigate('gerenciar')">
+    <a class="nav-item perm-admin" data-route="system.gerenciar" onclick="App.navigate('system','gerenciar')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
       Gerenciar
     </a>
+
   </nav>
 
   <!-- CONTEÚDO PRINCIPAL -->
-  <main class="main" id="main-content">
-    <!-- Páginas carregadas dinamicamente -->
-  </main>
+  <main class="main" id="main-content"></main>
 
 </div>
 
-<!-- Scripts -->
+<!-- Libs -->
 <script src="lib/supabase.js"></script>
 <script src="lib/auth.js"></script>
 <script src="lib/audit.js"></script>
+<!-- Core -->
 <script src="modules/app.js"></script>
-<script src="modules/dashboard.js"></script>
-<script src="modules/mapa.js"></script>
-<script src="modules/ocorrencias.js"></script>
-<script src="modules/historico.js"></script>
-<script src="modules/alertas.js"></script>
-<script src="modules/base.js"></script>
-<script src="modules/missoes.js"></script>
-<script src="modules/ordens.js"></script>
-<script src="modules/issi.js"></script>
-<script src="modules/inteligencia.js"></script>
-<script src="modules/relatorio.js"></script>
-<script src="modules/gerenciar.js"></script>
+<!-- 📡 Infraestrutura -->
+<script src="modules/infra/dashboard.js"></script>
+<script src="modules/infra/mapa.js"></script>
+<script src="modules/infra/registros.js"></script>
+<script src="modules/infra/historico.js"></script>
+<script src="modules/infra/alertas.js"></script>
+<script src="modules/infra/relatorio.js"></script>
+<script src="modules/infra/base.js"></script>
+<script src="modules/infra/missoes.js"></script>
+<script src="modules/infra/ordens.js"></script>
+<!-- 🧠 Inteligência / BI -->
+<script src="modules/bi/inteligencia.js"></script>
+<!-- 💰 Financeiro -->
+<script src="modules/financeiro/financeiro.js"></script>
+<!-- 🔧 Equipamentos -->
+<script src="modules/equipamentos/equipamentos.js"></script>
+<!-- 📻 Comunicações -->
+<script src="modules/comunicacoes/issi.js"></script>
+<script src="modules/comunicacoes/comunicacoes.js"></script>
+<!-- ⚙️ Sistema -->
+<script src="modules/system/gerenciar.js"></script>
 
 </body>
 </html>

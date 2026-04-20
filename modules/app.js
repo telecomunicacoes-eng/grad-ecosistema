@@ -1,10 +1,59 @@
 // ═══════════════════════════════════════
-// GRAD Ecossistema — APP CORE
-// Roteamento, busca global, utilitários
+// GRAD Ecossistema — APP CORE v2
+// Roteamento por nicho · busca global · utilitários
 // ═══════════════════════════════════════
 
 const App = {
-  currentPage: 'dashboard',
+  currentNiche:   'infra',
+  currentSection: 'dashboard',
+
+  // ── MAPA DE MÓDULOS ──────────────────
+  _modulos: {
+    infra: {
+      dashboard:  el => Dashboard.render(el),
+      registros:  el => Ocorrencias.render(el),
+      historico:  el => Historico.render(el),
+      alertas:    el => Alertas.render(el),
+      relatorio:  el => Relatorio.render(el),
+      mapa:       el => Mapa.render(el),
+      base:       el => Base.render(el),
+      missoes:    el => Missoes.render(el),
+      ordens:     el => Ordens.render(el),
+    },
+    bi: {
+      dashboard:  el => Inteligencia.render(el),
+      registros:  el => Inteligencia.renderRegistros(el),
+      historico:  el => Inteligencia.renderHistorico(el),
+      alertas:    el => Inteligencia.renderAlertas(el),
+      relatorio:  el => Inteligencia.renderRelatorio(el),
+    },
+    financeiro: {
+      dashboard:  el => Financeiro.renderDashboard(el),
+      registros:  el => Financeiro.renderRegistros(el),
+      historico:  el => Financeiro.renderHistorico(el),
+      alertas:    el => Financeiro.renderAlertas(el),
+      relatorio:  el => Financeiro.renderRelatorio(el),
+      contratos:  el => Financeiro.renderContratos(el),
+    },
+    equipamentos: {
+      dashboard:  el => Equipamentos.renderDashboard(el),
+      registros:  el => Equipamentos.renderRegistros(el),
+      historico:  el => Equipamentos.renderHistorico(el),
+      alertas:    el => Equipamentos.renderAlertas(el),
+      relatorio:  el => Equipamentos.renderRelatorio(el),
+    },
+    comunicacoes: {
+      dashboard:  el => Comunicacoes.renderDashboard(el),
+      registros:  el => Comunicacoes.renderRegistros(el),
+      historico:  el => Comunicacoes.renderHistorico(el),
+      alertas:    el => Comunicacoes.renderAlertas(el),
+      relatorio:  el => Comunicacoes.renderRelatorio(el),
+      issi:       el => Issi.render(el),
+    },
+    system: {
+      gerenciar:  el => Gerenciar.render(el),
+    },
+  },
 
   async init() {
     App._updateClock();
@@ -25,72 +74,97 @@ const App = {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'grid';
     App._setupSearch();
-    App._updateAlertBadge();
-    App.navigate('dashboard');
+    App._updateBadges();
+    App.navigate('infra', 'dashboard');
   },
 
-  navigate(page) {
-    App.currentPage = page;
+  // ── NAVIGATE (nicho + secao) ──────────
+  navigate(nicho, secao) {
+    App.currentNiche   = nicho;
+    App.currentSection = secao;
 
-    document.querySelectorAll('.nav-item').forEach(el => {
-      el.classList.toggle('active', el.dataset.page === page);
+    // Abre o niche correto no accordion
+    document.querySelectorAll('.niche-group').forEach(g => {
+      g.classList.toggle('open', g.id === `niche-${nicho}`);
     });
 
-    const main = document.getElementById('main-content');
-    main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px"><div class="spinner"></div></div>';
+    // Marca item ativo
+    const route = `${nicho}.${secao}`;
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.route === route);
+    });
 
-    const modulos = {
-      dashboard:    () => Dashboard.render(main),
-      mapa:         () => Mapa.render(main),
-      ocorrencias:  () => Ocorrencias.render(main),
-      historico:    () => Historico.render(main),
-      alertas:      () => Alertas.render(main),
-      base:         () => Base.render(main),
-      missoes:      () => Missoes.render(main),
-      ordens:       () => Ordens.render(main),
-      issi:         () => Issi.render(main),
-      inteligencia: () => Inteligencia.render(main),
-      relatorio:    () => Relatorio.render(main),
-      gerenciar:    () => Gerenciar.render(main),
-    };
+    // Spinner + render
+    const main = document.getElementById('main-content');
+    main.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px"><div class="spinner"></div></div>`;
 
     setTimeout(() => {
-      if (modulos[page]) modulos[page]();
-      else main.innerHTML = '<div class="page"><p class="muted">Módulo em desenvolvimento.</p></div>';
+      const fn = App._modulos[nicho]?.[secao];
+      if (fn) {
+        fn(main);
+      } else {
+        main.innerHTML = `
+          <div class="page">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              <div class="empty-state-title">Módulo em desenvolvimento</div>
+              <div class="empty-state-sub">${nicho} · ${secao}</div>
+            </div>
+          </div>`;
+      }
     }, 80);
   },
 
-  // ── BADGE DE ALERTAS ──────────────────
-  async _updateAlertBadge() {
+  // ── TOGGLE NICHE ACCORDION ────────────
+  toggleNiche(nicho) {
+    const group = document.getElementById(`niche-${nicho}`);
+    if (!group) return;
+    const isOpen = group.classList.contains('open');
+
+    // Fecha todos
+    document.querySelectorAll('.niche-group').forEach(g => g.classList.remove('open'));
+
+    // Abre clicado (se estava fechado) OU mantém se era o ativo
+    if (!isOpen || nicho === App.currentNiche) {
+      group.classList.add('open');
+    }
+
+    // Se clicar no niche ativo (que ficou aberto), navega para o dashboard dele
+    if (nicho !== App.currentNiche && !isOpen) {
+      const firstSection = Object.keys(App._modulos[nicho] || {})[0] || 'dashboard';
+      App.navigate(nicho, firstSection);
+    }
+  },
+
+  // ── BADGES ───────────────────────────
+  async _updateBadges() {
     try {
-      const { count } = await db
+      const { count: inop } = await db
         .from('ocorrencias')
         .select('*', { count: 'exact', head: true })
         .neq('situacao', 'Operacional');
 
-      const badge = document.getElementById('nav-badge-alertas');
-      if (badge) {
-        badge.textContent = count || 0;
-        badge.style.display = (count > 0) ? 'inline-flex' : 'none';
+      const bReg = document.getElementById('badge-infra-registros');
+      if (bReg) {
+        bReg.textContent = inop || 0;
+        bReg.style.display = (inop > 0) ? 'inline-flex' : 'none';
       }
 
-      // Badge de inoperantes no nav de ocorrências
-      const { count: inop } = await db
+      const { count: crit } = await db
         .from('ocorrencias')
         .select('*', { count: 'exact', head: true })
         .eq('situacao', 'Inoperante');
 
-      const badgeOc = document.getElementById('nav-badge-ocorrencias');
-      if (badgeOc) {
-        badgeOc.textContent = inop || 0;
-        badgeOc.style.display = (inop > 0) ? 'inline-flex' : 'none';
+      const bAlt = document.getElementById('badge-infra-alertas');
+      if (bAlt) {
+        bAlt.textContent = crit || 0;
+        bAlt.style.display = (crit > 0) ? 'inline-flex' : 'none';
       }
     } catch {}
   },
 
   // ── BUSCA GLOBAL (Ctrl+K) ─────────────
   _setupSearch() {
-    // Abre com Ctrl+K
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -103,9 +177,7 @@ const App = {
   toggleSearch() {
     const overlay = document.getElementById('search-overlay');
     if (!overlay) return;
-    const isOpen = overlay.classList.contains('open');
-    if (isOpen) App.closeSearch();
-    else App.openSearch();
+    overlay.classList.contains('open') ? App.closeSearch() : App.openSearch();
   },
 
   openSearch() {
@@ -115,12 +187,11 @@ const App = {
     overlay.classList.add('open');
     setTimeout(() => input?.focus(), 50);
     document.getElementById('search-results').innerHTML =
-      '<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">Digite para buscar sites, ocorrências ou módulos...</div>';
+      '<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">Digite para buscar sites, módulos, ocorrências...</div>';
   },
 
   closeSearch() {
-    const overlay = document.getElementById('search-overlay');
-    if (overlay) overlay.classList.remove('open');
+    document.getElementById('search-overlay')?.classList.remove('open');
   },
 
   async _doSearch(q) {
@@ -137,56 +208,58 @@ const App = {
     const ql = q.toLowerCase();
 
     try {
-      // Busca sites
       const sites = await dbQuery(d =>
-        d.from('sites')
-          .select('id,nome,cidade,risp:risps(nome)')
-          .ilike('nome', `%${q}%`)
-          .eq('ativo', true)
-          .limit(8)
+        d.from('sites').select('id,nome,cidade,risp:risps(nome)')
+          .ilike('nome', `%${q}%`).eq('ativo', true).limit(8)
       );
       (sites||[]).forEach(s => resultados.push({
         tipo: 'site', icone: '📡',
         label: s.nome, sub: `${s.cidade||''} · ${s.risp?.nome||''}`,
-        acao: `App.closeSearch();App.navigate('base')`
+        acao: `App.closeSearch();App.navigate('infra','base')`
       }));
 
-      // Busca ocorrências ativas
       const ocorrs = await dbQuery(d =>
-        d.from('ocorrencias')
-          .select('id,situacao,site:sites(nome,risp:risps(nome))')
-          .ilike('sites.nome', `%${q}%`)
-          .neq('situacao', 'Operacional')
-          .limit(6)
+        d.from('ocorrencias').select('id,situacao,site:sites(nome,risp:risps(nome))')
+          .ilike('sites.nome', `%${q}%`).neq('situacao', 'Operacional').limit(6)
       );
-      (ocorrs||[]).filter(o=>o.site?.nome?.toLowerCase().includes(ql)).forEach(o => resultados.push({
-        tipo: 'ocorrencia', icone: '⚠️',
+      (ocorrs||[]).filter(o => o.site?.nome?.toLowerCase().includes(ql)).forEach(o => resultados.push({
+        tipo: 'ocorrência', icone: '⚠️',
         label: o.site?.nome || '—',
         sub: `${o.situacao} · ${o.site?.risp?.nome||''}`,
-        acao: `App.closeSearch();App.navigate('ocorrencias')`
+        acao: `App.closeSearch();App.navigate('infra','registros')`
       }));
     } catch {}
 
-    // Módulos
+    // Módulos pesquisáveis
     const modulos = [
-      { nome: 'dashboard', label: 'Dashboard', sub: 'Visão geral', icone: '📊' },
-      { nome: 'mapa', label: 'Mapa de ERBs', sub: 'Mapa interativo', icone: '🗺️' },
-      { nome: 'ocorrencias', label: 'Ocorrências', sub: 'Falhas ativas', icone: '⚠️' },
-      { nome: 'historico', label: 'Histórico', sub: 'Timeline de ocorrências', icone: '📋' },
-      { nome: 'alertas', label: 'Alertas', sub: 'Situações críticas', icone: '🚨' },
-      { nome: 'base', label: 'Base de Sites', sub: 'Cadastro de ERBs', icone: '📡' },
-      { nome: 'missoes', label: 'Missões', sub: 'Operações de campo', icone: '🎯' },
-      { nome: 'ordens', label: 'Ordens de Serviço', sub: 'OS e manutenções', icone: '📝' },
-      { nome: 'issi', label: 'ISSI / GSSI', sub: 'Terminais rádio', icone: '📻' },
-      { nome: 'inteligencia', label: 'Inteligência', sub: 'Métricas e análises', icone: '📈' },
-      { nome: 'relatorio', label: 'Relatórios', sub: 'PDF e CSV', icone: '📄' },
-      { nome: 'gerenciar', label: 'Gerenciar', sub: 'Administração', icone: '⚙️' },
+      { nicho:'infra',        secao:'dashboard',   label:'Dashboard Infra',       sub:'Indicadores NMS · TETRA',         icone:'📡' },
+      { nicho:'infra',        secao:'registros',   label:'Registros de Falhas',   sub:'Ocorrências em aberto',           icone:'⚠️' },
+      { nicho:'infra',        secao:'alertas',     label:'Alertas Infra',         sub:'Sites inoperantes · críticos',    icone:'🚨' },
+      { nicho:'infra',        secao:'historico',   label:'Histórico Infra',       sub:'Falhas encerradas · timeline',    icone:'📋' },
+      { nicho:'infra',        secao:'relatorio',   label:'Relatório Infra',       sub:'PDF · Excel · métricas',          icone:'📄' },
+      { nicho:'infra',        secao:'mapa',        label:'Mapa de ERBs',          sub:'Mapa interativo por RISP',        icone:'🗺️' },
+      { nicho:'infra',        secao:'base',        label:'Base de Sites',         sub:'Cadastro de ERBs · CSV',          icone:'📡' },
+      { nicho:'infra',        secao:'missoes',     label:'Missões',               sub:'Operações de campo',              icone:'🎯' },
+      { nicho:'infra',        secao:'ordens',      label:'Ordens de Serviço',     sub:'OS e manutenções',                icone:'📝' },
+      { nicho:'bi',           secao:'dashboard',   label:'Dashboard BI',          sub:'KPIs consolidados · todos nichos',icone:'🧠' },
+      { nicho:'bi',           secao:'registros',   label:'Análises BI',           sub:'Cruzamentos · correlações',       icone:'📊' },
+      { nicho:'financeiro',   secao:'dashboard',   label:'Dashboard Financeiro',  sub:'Custos · faturas · contratos',    icone:'💰' },
+      { nicho:'financeiro',   secao:'registros',   label:'Faturas / Contratos',   sub:'Energia · vigência · valores',    icone:'🧾' },
+      { nicho:'financeiro',   secao:'contratos',   label:'Contratos',             sub:'Fornecedores · vigência',         icone:'📑' },
+      { nicho:'equipamentos', secao:'dashboard',   label:'Dashboard Equipamentos',sub:'Inventário · totais · status',    icone:'🔧' },
+      { nicho:'equipamentos', secao:'registros',   label:'Registros Equipamentos',sub:'Ficha individual · TEI · série',  icone:'📟' },
+      { nicho:'comunicacoes', secao:'dashboard',   label:'Dashboard Comunicações',sub:'Frotas · chamadas · por força',   icone:'📻' },
+      { nicho:'comunicacoes', secao:'registros',   label:'Frotas / Chamadas',     sub:'GSSI · PM · PRF · GEFRON',        icone:'📡' },
+      { nicho:'comunicacoes', secao:'issi',        label:'ISSI / GSSI',           sub:'Terminais e identificadores',     icone:'📟' },
+      { nicho:'system',       secao:'gerenciar',   label:'Gerenciar',             sub:'Administração do sistema',        icone:'⚙️' },
     ];
-    modulos.filter(m => m.label.toLowerCase().includes(ql) || m.sub.toLowerCase().includes(ql))
+
+    modulos
+      .filter(m => m.label.toLowerCase().includes(ql) || m.sub.toLowerCase().includes(ql))
       .forEach(m => resultados.push({
-        tipo: 'modulo', icone: m.icone,
+        tipo: 'módulo', icone: m.icone,
         label: m.label, sub: m.sub,
-        acao: `App.closeSearch();App.navigate('${m.nome}')`
+        acao: `App.closeSearch();App.navigate('${m.nicho}','${m.secao}')`
       }));
 
     if (!resultados.length) {
@@ -194,7 +267,7 @@ const App = {
       return;
     }
 
-    resultsEl.innerHTML = resultados.map((r,i) => `
+    resultsEl.innerHTML = resultados.map((r, i) => `
       <div class="search-result-item" onclick="${r.acao}" tabindex="${i}">
         <span style="font-size:18px;flex-shrink:0">${r.icone}</span>
         <div style="flex:1;min-width:0">
@@ -231,7 +304,7 @@ const Modal = {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-overlay';
-    overlay.onclick = (e) => { if (e.target === overlay) Modal.close(); };
+    overlay.onclick = e => { if (e.target === overlay) Modal.close(); };
 
     const botoesHTML = botoes.map(b =>
       `<button class="btn ${b.class||'btn-ghost'}" onclick="${b.onclick}">${b.label}</button>`
@@ -256,8 +329,8 @@ const Modal = {
 // ── UTILITÁRIOS ──────────────────────
 function diffDays(dataStr, dataFim) {
   if (!dataStr) return 0;
-  const d    = new Date(dataStr);
-  const ref  = dataFim ? new Date(dataFim) : new Date();
+  const d   = new Date(dataStr);
+  const ref = dataFim ? new Date(dataFim) : new Date();
   return Math.floor((ref - d) / 86400000);
 }
 
@@ -269,6 +342,11 @@ function formatDate(str) {
 function formatDateTime(str) {
   if (!str) return '—';
   return new Date(str).toLocaleString('pt-BR');
+}
+
+function formatCurrency(val) {
+  if (val == null) return '—';
+  return Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function daysBadge(dias) {

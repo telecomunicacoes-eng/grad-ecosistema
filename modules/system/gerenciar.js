@@ -4,15 +4,14 @@
 // ═══════════════════════════════════════
 
 const Gerenciar = {
-  _aba: 'sites',
+  _aba: 'dados',
 
   async render(container) {
     if (!Auth.isAdmin()) {
       container.innerHTML = `
         <div class="page fade-in">
           <div class="empty-state" style="height:300px">
-            <div class="empty-state-icon">🔒</div>
-            <div class="empty-state-title">Acesso restrito</div>
+            <div class="empty-state-title">🔒 Acesso restrito</div>
             <div class="empty-state-sub">Esta área é exclusiva para administradores</div>
           </div>
         </div>`;
@@ -23,14 +22,15 @@ const Gerenciar = {
       <div class="page fade-in">
         <div class="page-header">
           <div>
-            <div class="page-title">Gerenciar</div>
-            <div class="page-sub">Administração do sistema</div>
+            <div class="page-title">Gerenciar dados</div>
+            <div class="page-sub">Administrar sites, RISPs, importação e exportação</div>
           </div>
         </div>
 
         <!-- Abas -->
         <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px">
           ${[
+            { id:'dados',    label:'⚙️ Configurações' },
             { id:'sites',    label:'📡 Sites' },
             { id:'risps',    label:'🗺️ RISPs' },
             { id:'motivos',  label:'⚠️ Motivos' },
@@ -47,20 +47,20 @@ const Gerenciar = {
         <div id="gerenciar-conteudo"></div>
       </div>`;
 
-    await Gerenciar.irAba('sites');
+    await Gerenciar.irAba('dados');
   },
 
   async irAba(aba) {
     Gerenciar._aba = aba;
-    // Estilo das abas
     document.querySelectorAll('[id^="aba-"]').forEach(el => {
       el.style.borderBottom = '';
       el.style.color = '';
     });
     const el = document.getElementById(`aba-${aba}`);
-    if (el) { el.style.borderBottom = '2px solid var(--accent)'; el.style.color = 'var(--accent)'; }
+    if (el) { el.style.borderBottom = '2px solid var(--accent2)'; el.style.color = 'var(--accent2)'; }
 
     const metodos = {
+      dados:     Gerenciar._renderDados,
       sites:     Gerenciar._renderSites,
       risps:     Gerenciar._renderRisps,
       motivos:   Gerenciar._renderMotivos,
@@ -68,6 +68,391 @@ const Gerenciar = {
       auditoria: Gerenciar._renderAuditoria,
     };
     if (metodos[aba]) await metodos[aba]();
+  },
+
+  // ══════════════════════════════════════
+  // ABA DADOS — Total ERBs · CSV · Export
+  // ══════════════════════════════════════
+  async _renderDados() {
+    const el = document.getElementById('gerenciar-conteudo');
+    el.innerHTML = '<div style="display:flex;justify-content:center;padding:40px"><div class="spinner"></div></div>';
+
+    let totalMonitorado = 231;
+    try {
+      const { data } = await db.from('config').select('valor').eq('chave', 'total_monitorado').single();
+      if (data?.valor) totalMonitorado = parseInt(data.valor) || 231;
+    } catch {}
+
+    el.innerHTML = `
+      <!-- Total ERBs -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Total de ERBs / Sites monitorados</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">
+          Informe o total real da rede NMS. O dashboard calcula automaticamente: Total − Inoperantes − Modo Local − Parcial = Operando.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;max-width:340px">
+          <input class="form-input" id="cfg-total-monitorado" type="number" value="${totalMonitorado}" min="1" max="9999"
+            style="font-size:22px;font-family:var(--mono);font-weight:700;text-align:center;max-width:120px">
+          <button class="btn btn-primary" onclick="Gerenciar._salvarTotalMonitorado()">Salvar</button>
+          <span id="cfg-total-feedback" style="font-size:12px;color:#34d399"></span>
+        </div>
+      </div>
+
+      <!-- Linha 2: RISPs + Motivos -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+        <!-- RISPs -->
+        <div class="card">
+          <div class="card-title">RISPs cadastradas</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Gerencie as regiões de segurança pública.</div>
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <input class="form-input" id="new-risp-input" placeholder="Ex: RISP 16" style="flex:1;font-size:13px">
+            <button class="btn btn-primary btn-sm" onclick="Gerenciar._addRisp()">+ Adicionar</button>
+          </div>
+          <div id="risp-list-gerenciar" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
+        </div>
+
+        <!-- Motivos -->
+        <div class="card">
+          <div class="card-title">Motivos de falha</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Catálogo padronizado para relatórios precisos.</div>
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <input class="form-input" id="new-motivo-input" placeholder="Novo motivo de falha..." style="flex:1;font-size:13px">
+            <button class="btn btn-primary btn-sm" onclick="Gerenciar._addMotivoDados()">+ Adicionar</button>
+          </div>
+          <div id="motivos-list-gerenciar" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Linha 3: Importar CSV + Exportar -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+        <!-- CSV Import -->
+        <div class="card">
+          <div class="card-title">Importar sites (CSV)</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">
+            Aceita vírgula ou ponto-e-vírgula. Colunas: <span style="font-family:var(--mono);color:var(--accent2)">SBS · NOME · CIDADE · RISP · CR · TRAFEGO · PROP · LAT · LON</span>
+          </div>
+          <div id="csv-drop-zone"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent2)'"
+            ondragleave="this.style.borderColor=''"
+            ondrop="Gerenciar._handleCSVDrop(event)"
+            onclick="document.getElementById('csv-file-input').click()"
+            style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:8px">
+            <div style="font-size:22px;margin-bottom:6px">⬆</div>
+            <div style="font-size:13px;color:var(--text2)">Clique ou arraste o arquivo CSV aqui</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Formato: .csv · Separador vírgula ou ponto-e-vírgula · UTF-8 ou ANSI</div>
+          </div>
+          <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="Gerenciar._importCSV(this)">
+          <div id="import-feedback" style="font-size:12px;min-height:16px;margin-bottom:8px"></div>
+          <button class="btn btn-ghost btn-sm" onclick="Gerenciar._downloadCSVTemplate()">
+            ↓ Baixar modelo de planilha (.csv)
+          </button>
+        </div>
+
+        <!-- Exportar -->
+        <div class="card">
+          <div class="card-title">Exportar dados</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:12px">
+            Exporte a base de sites ou os registros de ocorrência para CSV compatível com Google Sheets e BigQuery.
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-ghost" onclick="Gerenciar._exportBaseSites()" style="justify-content:flex-start;gap:10px">
+              <span style="font-size:14px">↓</span> Exportar BASE_MESTRE (.csv)
+            </button>
+            <button class="btn btn-ghost" onclick="Gerenciar._exportRegistros()" style="justify-content:flex-start;gap:10px">
+              <span style="font-size:14px">↓</span> Exportar REGISTROS (.csv)
+            </button>
+            <button class="btn btn-ghost" onclick="Gerenciar._exportJSON()" style="justify-content:flex-start;gap:10px">
+              <span style="font-size:14px">↓</span> Exportar backup completo (.json)
+            </button>
+            <button class="btn btn-ghost" onclick="document.getElementById('json-import-input').click()" style="justify-content:flex-start;gap:10px">
+              <span style="font-size:14px">↑</span> Restaurar backup (.json)
+            </button>
+            <input type="file" id="json-import-input" accept=".json" style="display:none" onchange="Gerenciar._doImportJSON(this)">
+            <button class="btn btn-danger" onclick="Gerenciar._limparDados()" style="justify-content:flex-start;gap:10px;margin-top:6px">
+              🗑 Limpar dados locais (resetar)
+            </button>
+          </div>
+        </div>
+      </div>`;
+
+    await Gerenciar._renderRispListDados();
+    await Gerenciar._renderMotivoListDados();
+  },
+
+  async _salvarTotalMonitorado() {
+    const v = parseInt(document.getElementById('cfg-total-monitorado')?.value) || 0;
+    const fb = document.getElementById('cfg-total-feedback');
+    if (v < 1 || v > 9999) { if (fb) fb.textContent = '⚠ Valor inválido.'; return; }
+    try {
+      const { error } = await db.from('config').upsert({ chave: 'total_monitorado', valor: String(v) });
+      if (error) throw error;
+      if (fb) { fb.textContent = `✓ Total atualizado para ${v} sites.`; setTimeout(() => { if (fb) fb.textContent = ''; }, 4000); }
+      Toast.show(`Total monitorado: ${v} sites salvo`, 'success');
+    } catch (err) {
+      Toast.show(err.message, 'error');
+    }
+  },
+
+  async _renderRispListDados() {
+    const el = document.getElementById('risp-list-gerenciar');
+    if (!el) return;
+    const risps = await dbQuery(d => d.from('risps').select('id,nome').order('nome')) || [];
+    el.innerHTML = risps.map(r => {
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+        <span style="flex:1;font-size:12px;color:var(--text2)">${r.nome}</span>
+        <button onclick="Gerenciar._editarRispInline('${r.id}','${r.nome.replace(/'/g,"\\'")}','${el.id}')"
+          style="font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer">editar</button>
+        <button onclick="Gerenciar._removerRisp('${r.id}')"
+          style="font-size:13px;color:#f87171;background:none;border:none;cursor:pointer;line-height:1">×</button>
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:var(--text3);padding:8px">Nenhuma RISP cadastrada</div>';
+  },
+
+  async _addRisp() {
+    const input = document.getElementById('new-risp-input');
+    const nome = input?.value?.trim();
+    if (!nome) { Toast.show('Digite o nome da RISP', 'error'); return; }
+    try {
+      const { error } = await db.from('risps').insert({ nome });
+      if (error) throw error;
+      if (input) input.value = '';
+      Toast.show(`RISP "${nome}" adicionada`, 'success');
+      await Gerenciar._renderRispListDados();
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  _editarRispInline(id, nomeAtual) {
+    const novoNome = prompt('Novo nome da RISP:', nomeAtual);
+    if (!novoNome || novoNome === nomeAtual) return;
+    db.from('risps').update({ nome: novoNome }).eq('id', id)
+      .then(({ error }) => {
+        if (error) { Toast.show(error.message, 'error'); return; }
+        Toast.show('RISP atualizada', 'success');
+        Gerenciar._renderRispListDados();
+      });
+  },
+
+  async _removerRisp(id) {
+    if (!confirm('Remover esta RISP? Os sites desta RISP não serão excluídos.')) return;
+    try {
+      const { error } = await db.from('risps').delete().eq('id', id);
+      if (error) throw error;
+      Toast.show('RISP removida', 'warn');
+      await Gerenciar._renderRispListDados();
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  async _renderMotivoListDados() {
+    const el = document.getElementById('motivos-list-gerenciar');
+    if (!el) return;
+    const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').order('descricao')) || [];
+    const regs    = await dbQuery(d => d.from('ocorrencias').select('motivo_id')) || [];
+    el.innerHTML = motivos.map(m => {
+      const cnt = regs.filter(r => r.motivo_id === m.id).length;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+        <span style="flex:1;font-size:11px;color:var(--text2);line-height:1.3">${m.descricao}</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text3)">${cnt}x</span>
+        <button onclick="Gerenciar._removerMotivoDados('${m.id}')"
+          style="font-size:13px;color:#f87171;background:none;border:none;cursor:pointer;line-height:1">×</button>
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:var(--text3);padding:8px">Nenhum motivo cadastrado</div>';
+  },
+
+  async _addMotivoDados() {
+    const input = document.getElementById('new-motivo-input');
+    const desc  = input?.value?.trim();
+    if (!desc) { Toast.show('Digite o motivo', 'error'); return; }
+    try {
+      const { error } = await db.from('motivos_falha').insert({ descricao: desc });
+      if (error) throw error;
+      if (input) input.value = '';
+      Toast.show('Motivo adicionado', 'success');
+      await Gerenciar._renderMotivoListDados();
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  async _removerMotivoDados(id) {
+    if (!confirm('Remover este motivo?')) return;
+    try {
+      const { error } = await db.from('motivos_falha').delete().eq('id', id);
+      if (error) throw error;
+      Toast.show('Motivo removido', 'warn');
+      await Gerenciar._renderMotivoListDados();
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  // ── CSV IMPORT ──────────────────────
+  _handleCSVDrop(e) {
+    e.preventDefault();
+    document.getElementById('csv-drop-zone').style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.name.match(/\.(csv|txt)$/i)) {
+      document.getElementById('import-feedback').innerHTML = '<span style="color:#f87171">⚠ Selecione um arquivo .csv</span>';
+      return;
+    }
+    Gerenciar._importCSV({ files: [file] });
+  },
+
+  _parseCSVLine(line, sep) {
+    if (sep === '\t') return line.split('\t').map(c => c.replace(/^"|"$/g, '').trim());
+    const result = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if ((c === ',' || c === ';') && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur.trim());
+    return result;
+  },
+
+  async _importCSV(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async e => {
+      let text = e.target.result;
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const fb = document.getElementById('import-feedback');
+      if (lines.length < 2) { if (fb) fb.innerHTML = '<span style="color:#f87171">⚠ Arquivo vazio ou sem dados.</span>'; return; }
+      const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+      const rawH = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g,'').replace(/[^a-z0-9]/g,'_'));
+      const col = {
+        nome:    rawH.findIndex(h => ['nome','nome_do_local','local','site','descricao'].some(k => h.includes(k))),
+        cidade:  rawH.findIndex(h => ['cidade','municipio','city'].some(k => h.includes(k))),
+        risp:    rawH.findIndex(h => h.includes('risp')),
+        lat:     rawH.findIndex(h => h === 'lat' || h.includes('latit')),
+        lon:     rawH.findIndex(h => h === 'lon' || h === 'lng' || h.includes('longit')),
+        ativo:   rawH.findIndex(h => h.includes('ativo')),
+      };
+
+      const risps = await dbQuery(d => d.from('risps').select('id,nome')) || [];
+      const getRispId = nome => {
+        const norm = nome.replace(/^risp\s*/i,'RISP ').replace(/RISP(\d)/,'RISP $1').trim();
+        return risps.find(r => r.nome === norm || r.nome.toLowerCase() === norm.toLowerCase())?.id || null;
+      };
+
+      let added = 0, skipped = 0;
+      const get = (cols, key) => col[key] >= 0 ? (cols[col[key]] || '').replace(/^"|"$/g,'').trim() : '';
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cols = Gerenciar._parseCSVLine(lines[i], sep);
+        const nome = get(cols,'nome');
+        if (!nome) { skipped++; continue; }
+        const risp_id  = getRispId(get(cols,'risp'));
+        const lat      = parseFloat(get(cols,'lat').replace(',','.')) || null;
+        const lon      = parseFloat(get(cols,'lon').replace(',','.')) || null;
+        const payload  = {
+          nome,
+          cidade:    get(cols,'cidade') || null,
+          risp_id,
+          latitude:  isNaN(lat)  ? null : lat,
+          longitude: isNaN(lon)  ? null : lon,
+          ativo:     true,
+        };
+        try {
+          const { error } = await db.from('sites').insert(payload);
+          if (error && error.code !== '23505') { skipped++; continue; }
+          if (error?.code === '23505') { skipped++; continue; }
+          added++;
+        } catch { skipped++; }
+      }
+      const msg = `✓ ${added} site(s) importado(s). ${skipped} ignorado(s).`;
+      if (fb) fb.innerHTML = `<span style="color:${added > 0 ? '#34d399' : '#f87171'}">${msg}</span>`;
+      if (added > 0) {
+        Toast.show(`${added} site(s) importado(s)`, 'success');
+        await Gerenciar._renderSites();
+      }
+      if (input.value !== undefined) input.value = '';
+    };
+    reader.readAsText(file, 'UTF-8');
+  },
+
+  _downloadCSVTemplate() {
+    const csv = 'NOME;CIDADE;RISP;LAT;LON\nSBS-001 Cuiabá Centro;Cuiabá;RISP 1;-15.5989;-56.0949\nSBS-012 Rondonópolis;Rondonópolis;RISP 5;-16.4699;-54.6364';
+    Gerenciar._dlFile('data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv), 'GRAD_modelo_importacao.csv');
+  },
+
+  // ── EXPORT ────────────────────────────
+  async _exportBaseSites() {
+    Toast.show('Gerando BASE_MESTRE…', 'info');
+    try {
+      const sites = await dbQuery(d => d.from('sites').select('*,risp:risps(nome)').order('nome')) || [];
+      const rows = sites.map(s => [
+        s.nome, s.cidade, s.risp?.nome||'', s.latitude||'', s.longitude||'', s.ativo?'Sim':'Não'
+      ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+      const csv = ['NOME,CIDADE,RISP,LAT,LON,ATIVO', ...rows].join('\n');
+      Gerenciar._dlFile('data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv),
+        `GRAD_BASE_MESTRE_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  async _exportRegistros() {
+    Toast.show('Gerando REGISTROS…', 'info');
+    try {
+      const ocs = await dbQuery(d =>
+        d.from('ocorrencias').select('*,site:sites(nome,cidade,risp:risps(nome)),motivo:motivos_falha(descricao)').order('inicio', { ascending: false })
+      ) || [];
+      const rows = ocs.map(o => [
+        o.site?.nome||'', o.site?.cidade||'', o.site?.risp?.nome||'', o.situacao,
+        o.motivo?.descricao||'', o.inicio, o.prazo||'', o.operador||'', o.glpi||''
+      ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+      const csv = ['SITE,CIDADE,RISP,SITUAÇÃO,MOTIVO,INÍCIO,PRAZO,OPERADOR,GLPI', ...rows].join('\n');
+      Gerenciar._dlFile('data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv),
+        `GRAD_REGISTROS_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  async _exportJSON() {
+    Toast.show('Gerando backup…', 'info');
+    try {
+      const [sites, ocorrs, risps, motivos] = await Promise.all([
+        dbQuery(d => d.from('sites').select('*')),
+        dbQuery(d => d.from('ocorrencias').select('*')),
+        dbQuery(d => d.from('risps').select('*')),
+        dbQuery(d => d.from('motivos_falha').select('*')),
+      ]);
+      const data = JSON.stringify({ sites, ocorrencias: ocorrs, risps, motivos, exportedAt: new Date().toISOString() }, null, 2);
+      Gerenciar._dlFile('data:application/json;charset=utf-8,' + encodeURIComponent(data),
+        `GRAD_BACKUP_${new Date().toISOString().split('T')[0]}.json`);
+      Toast.show('Backup exportado com sucesso', 'success');
+    } catch (err) { Toast.show(err.message, 'error'); }
+  },
+
+  async _doImportJSON(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const d = JSON.parse(e.target.result);
+        if (!confirm(`Restaurar backup de ${d.exportedAt || 'data desconhecida'}?\nIsso adicionará os dados ao Supabase.`)) return;
+        let ok = 0;
+        if (d.risps?.length)    { await db.from('risps').upsert(d.risps); ok++; }
+        if (d.motivos?.length)  { await db.from('motivos_falha').upsert(d.motivos); ok++; }
+        if (d.sites?.length)    { await db.from('sites').upsert(d.sites); ok++; }
+        if (d.ocorrencias?.length) { await db.from('ocorrencias').upsert(d.ocorrencias); ok++; }
+        Toast.show('Backup restaurado com sucesso!', 'success');
+        await Gerenciar._renderSites();
+      } catch (err) { Toast.show('Erro ao restaurar: ' + err.message, 'error'); }
+      if (input.value !== undefined) input.value = '';
+    };
+    reader.readAsText(file, 'UTF-8');
+  },
+
+  async _limparDados() {
+    if (!confirm('⚠️ ATENÇÃO: Isso não apaga dados do Supabase, apenas limpa o cache local. Deseja continuar?')) return;
+    localStorage.clear();
+    Toast.show('Cache local limpo. Recarregue a página.', 'warn');
+  },
+
+  _dlFile(href, name) {
+    const a = document.createElement('a');
+    a.href = href; a.download = name; a.click();
   },
 
   // ══════════════════════════════════════

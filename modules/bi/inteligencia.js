@@ -300,5 +300,142 @@ const Inteligencia = {
           </div>` :
           '<div class="empty-state" style="padding:20px 0"><div class="empty-state-title" style="font-size:13px">Sem dados</div></div>'}
       </div>`;
-  }
+  },
+
+  // ── SEÇÕES ADICIONAIS DO NICHO BI ──────
+
+  renderRegistros(el) {
+    el.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div><div class="page-title">Registros — Análises BI</div>
+          <div class="page-sub">Cruzamentos mapeados · Correlações identificadas</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          ${[
+            { cor:'blue', titulo:'Custo Energia × Sites Inop.', desc:'Correlação entre faturas elevadas e sites inoperantes por RISP', status:'Monitorando' },
+            { cor:'purple', titulo:'Chamadas × Disponibilidade', desc:'Volume de comunicações TETRA vs. disponibilidade dos sites', status:'Monitorando' },
+            { cor:'amber', titulo:'Equipamentos × Falhas', desc:'Taxa de manutenções vs. falhas recorrentes por local', status:'Em análise' },
+            { cor:'green', titulo:'MTTR × Tipo de Causa', desc:'Tempo médio de resolução por categoria de causa', status:'Concluído' },
+          ].map(a => `
+            <div class="card" style="border-left:3px solid var(--${a.cor === 'blue' ? 'accent2' : a.cor === 'amber' ? 'amber' : a.cor === 'green' ? 'green' : 'purple'})">
+              <div class="card-title">${a.titulo}</div>
+              <div style="font-size:13px;color:var(--text2);margin-bottom:10px">${a.desc}</div>
+              <span class="badge ${a.status === 'Monitorando' ? 'badge-blue' : a.status === 'Em análise' ? 'badge-amber' : 'badge-green'}">${a.status}</span>
+            </div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="card-title">Entradas de Análise</div>
+          <div class="table-wrap" style="border:none">
+            <table>
+              <thead><tr><th>Cruzamento</th><th>Período</th><th>Resultado</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Energia × Inoperância RISP 1</td><td>Jan–Mar 2026</td><td>Correlação 73%</td><td><span class="badge badge-green">Concluído</span></td></tr>
+                <tr><td>Chamadas PM × Disponibilidade</td><td>Fev–Abr 2026</td><td>Em processamento</td><td><span class="badge badge-amber">Em análise</span></td></tr>
+                <tr><td>Equipamentos sem local × Falhas</td><td>Mar 2026</td><td>—</td><td><span class="badge badge-blue">Monitorando</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  },
+
+  renderHistorico(el) {
+    el.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div><div class="page-title">Histórico — Série Histórica BI</div>
+          <div class="page-sub">Evolução de todos os indicadores do ecossistema</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Indicadores por Período</div>
+          <div class="table-wrap" style="border:none">
+            <table>
+              <thead><tr><th>Período</th><th>Falhas Infra</th><th>Custo Energia</th><th>Equip. Manutenção</th><th>Chamadas Totais</th><th>Disponibilidade</th></tr></thead>
+              <tbody>
+                ${[
+                  ['Nov/2025','18','R$ 142.300','4','38.200','91,2%'],
+                  ['Dez/2025','22','R$ 158.700','6','41.500','88,7%'],
+                  ['Jan/2026','15','R$ 135.400','3','39.100','93,1%'],
+                  ['Fev/2026','19','R$ 147.200','5','42.300','90,4%'],
+                  ['Mar/2026','12','R$ 129.800','2','44.700','95,2%'],
+                  ['Abr/2026','9','R$ 121.500','3','43.100','96,4%'],
+                ].map(r => `<tr>${r.map((v,i) => `<td style="color:${i===4?'#34d399':i===1?'#f87171':'var(--text2)'}">${v}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  },
+
+  renderAlertas(el) {
+    el.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div><div class="page-title">Alertas — Inteligência / BI</div>
+          <div class="page-sub">Anomalias detectadas · Padrões críticos · Indicadores fora da curva</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          ${[
+            { cor:'#f87171', borda:'rgba(248,113,113,.3)', titulo:'Anomalias Críticas', itens:[
+              'RISP 5 — Custo de energia 38% acima da média histórica em Abr/2026',
+              'Sites SBS-023 e SBS-031 — inoperância recorrente (3ª vez em 60 dias)',
+            ]},
+            { cor:'#fbbf24', borda:'rgba(251,191,36,.3)', titulo:'Padrões de Atenção', itens:[
+              'Queda de 22% em chamadas GEFRON — RISP 12 — Mar→Abr 2026',
+              'Equipamentos em manutenção aumentaram 40% em relação ao trimestre anterior',
+            ]},
+            { cor:'#3d9bff', borda:'rgba(61,155,255,.3)', titulo:'Indicadores Monitorados', itens:[
+              'Disponibilidade geral da rede: 96,4% (acima da meta de 95%)',
+              'MTTR médio: 4,2 dias — melhor resultado dos últimos 6 meses',
+            ]},
+          ].map(s => `
+            <div class="card" style="border-left:3px solid ${s.borda}">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                <div style="font-size:13px;font-weight:700;color:${s.cor}">${s.titulo}</div>
+                <span class="nav-badge" style="background:${s.cor};position:static;margin:0">${s.itens.length}</span>
+              </div>
+              ${s.itens.map(i => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)">${i}</div>`).join('')}
+            </div>`).join('')}
+        </div>
+      </div>`;
+  },
+
+  renderRelatorio(el) {
+    el.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div><div class="page-title">Relatório Analítico — BI</div>
+          <div class="page-sub">Consolidado cruzado · Todos os nichos · Exportável</div></div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="Toast.show('Gerando PDF analítico...','info')">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              PDF Analítico
+            </button>
+            <button class="btn btn-ghost" onclick="Toast.show('Exportando Excel...','info')">Excel</button>
+          </div>
+        </div>
+        <div class="filter-bar" style="margin-bottom:14px">
+          <select class="form-select">
+            <option>Todos os nichos</option><option>Infraestrutura</option><option>Financeiro</option><option>Equipamentos</option><option>Comunicações</option>
+          </select>
+          <input type="month" class="form-input" value="2026-01">
+          <input type="month" class="form-input" value="2026-04">
+        </div>
+        <div class="card">
+          <div class="card-title">Síntese Consolidada</div>
+          <div class="table-wrap" style="border:none">
+            <table>
+              <thead><tr><th>Nicho</th><th>Principal Indicador</th><th>Valor Abr/2026</th><th>vs. Mês Anterior</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>📡 Infraestrutura</td><td>Disponibilidade</td><td>96,4%</td><td>▲ +1,2%</td><td><span class="badge badge-green">Normal</span></td></tr>
+                <tr><td>💰 Financeiro</td><td>Custo Energia</td><td>R$ 121.500</td><td>▼ -6,4%</td><td><span class="badge badge-green">Normal</span></td></tr>
+                <tr><td>🔧 Equipamentos</td><td>Em Manutenção</td><td>3</td><td>▲ +1</td><td><span class="badge badge-amber">Atenção</span></td></tr>
+                <tr><td>📻 Comunicações</td><td>Total Chamadas</td><td>43.100</td><td>▼ -3,8%</td><td><span class="badge badge-amber">Atenção</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  },
 };
