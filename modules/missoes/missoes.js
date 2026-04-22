@@ -306,5 +306,157 @@ const Missoes = {
     } catch (err) {
       Toast.show(err.message || 'Erro ao salvar', 'error');
     }
+  },
+
+  // ── DASHBOARD ────────────────────────
+  async renderDashboard(el) {
+    el.innerHTML = `
+      <div class="page fade-in">
+        <div class="page-header">
+          <div>
+            <div class="page-title">🎯 Missões — Dashboard</div>
+            <div class="page-sub">Visão geral das operações de campo</div>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost btn-sm" onclick="App.navigate('missoes','lista')">Ver todas →</button>
+          </div>
+        </div>
+        <div id="mis-dash-kpis" class="kpi-grid" style="margin-bottom:20px">
+          <div style="grid-column:1/-1;display:flex;justify-content:center;padding:40px"><div class="spinner"></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="card">
+            <div class="card-title">Por Status</div>
+            <canvas id="mis-dash-status" height="200"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Por Tipo</div>
+            <canvas id="mis-dash-tipo" height="200"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Missões Recentes</div>
+          <div id="mis-dash-recentes"></div>
+        </div>
+      </div>`;
+
+    try {
+      const data = await dbQuery(d =>
+        d.from('missoes').select('*').order('criado_em', { ascending: false }).limit(200)
+      );
+      const missoes = data || [];
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+
+      const total      = missoes.length;
+      const andamento  = missoes.filter(m => m.status === 'Em andamento').length;
+      const planejadas = missoes.filter(m => m.status === 'Planejada').length;
+      const concluidas = missoes.filter(m => m.status === 'Concluída').length;
+      const canceladas = missoes.filter(m => m.status === 'Cancelada').length;
+      const atrasadas  = missoes.filter(m =>
+        m.data_fim && new Date(m.data_fim) < hoje &&
+        m.status !== 'Concluída' && m.status !== 'Cancelada'
+      ).length;
+
+      document.getElementById('mis-dash-kpis').innerHTML = `
+        <div class="kpi-card blue">
+          <div class="kpi-label">Total de Missões</div>
+          <div class="kpi-value">${total}</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-label">Em Andamento</div>
+          <div class="kpi-value">${andamento}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Planejadas</div>
+          <div class="kpi-value">${planejadas}</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-label">Concluídas</div>
+          <div class="kpi-value">${concluidas}</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-label">Atrasadas</div>
+          <div class="kpi-value">${atrasadas}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Canceladas</div>
+          <div class="kpi-value">${canceladas}</div>
+        </div>`;
+
+      // Gráfico de status (doughnut)
+      new Chart(document.getElementById('mis-dash-status'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Planejada', 'Em andamento', 'Concluída', 'Cancelada'],
+          datasets: [{
+            data: [planejadas, andamento, concluidas, canceladas],
+            backgroundColor: ['#3b82f6','#f59e0b','#22c55e','#6b7280'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: '#9ab8d8', font: { size: 13 } } } }
+        }
+      });
+
+      // Gráfico de tipo (barras horizontais)
+      const tipoMap = {};
+      missoes.forEach(m => { if (m.tipo) tipoMap[m.tipo] = (tipoMap[m.tipo] || 0) + 1; });
+      const tipoLabels = Object.keys(tipoMap);
+      const tipoValues = tipoLabels.map(k => tipoMap[k]);
+
+      new Chart(document.getElementById('mis-dash-tipo'), {
+        type: 'bar',
+        data: {
+          labels: tipoLabels.length ? tipoLabels : ['Sem dados'],
+          datasets: [{
+            data: tipoValues.length ? tipoValues : [0],
+            backgroundColor: '#3b82f6',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#9ab8d8', font: { size: 12 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+            y: { ticks: { color: '#daeaff', font: { size: 13 } }, grid: { display: false } }
+          }
+        }
+      });
+
+      // Tabela de recentes
+      const recentes = missoes.slice(0, 10);
+      const statusCor = { 'Planejada':'badge-blue','Em andamento':'badge-amber','Concluída':'badge-green','Cancelada':'badge-gray' };
+      document.getElementById('mis-dash-recentes').innerHTML = recentes.length ? `
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Missão</th><th>Tipo</th><th>Status</th>
+                <th>Responsável</th><th>Início</th><th>Fim</th>
+              </tr>
+            </thead>
+            <tbody>${recentes.map(m => `
+              <tr>
+                <td>${m.titulo||'—'}</td>
+                <td>${m.tipo||'—'}</td>
+                <td><span class="badge ${statusCor[m.status]||'badge-gray'}">${m.status||'—'}</span></td>
+                <td>${m.responsavel||'—'}</td>
+                <td>${formatDate(m.data_inicio)}</td>
+                <td>${formatDate(m.data_fim)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` :
+        '<div class="empty-state"><div class="empty-state-icon">🎯</div><div class="empty-state-title">Nenhuma missão registrada</div></div>';
+
+    } catch (err) {
+      document.getElementById('mis-dash-kpis').innerHTML =
+        `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">Erro ao carregar dashboard</div><div class="empty-state-sub">${err.message||''}</div></div>`;
+    }
   }
 };

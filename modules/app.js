@@ -9,6 +9,9 @@ const App = {
 
   // ── MAPA DE MÓDULOS ──────────────────
   _modulos: {
+    painel: {
+      apresentacao: el => Painel.render(el),
+    },
     infra: {
       dashboard:  el => Dashboard.render(el),
       registros:  el => Ocorrencias.render(el),
@@ -20,6 +23,7 @@ const App = {
       ordens:     el => Ordens.render(el),
     },
     missoes: {
+      dashboard:  el => Missoes.renderDashboard(el),
       lista:      el => Missoes.render(el),
     },
     bi: {
@@ -241,6 +245,8 @@ const App = {
       { nicho:'infra',        secao:'relatorio',   label:'Relatório Infra',       sub:'PDF · Excel · métricas',          icone:'📄' },
       { nicho:'infra',        secao:'mapa',        label:'Mapa de ERBs',          sub:'Mapa interativo por RISP',        icone:'🗺️' },
       { nicho:'infra',        secao:'base',        label:'Base de Sites',         sub:'Cadastro de ERBs · CSV',          icone:'📡' },
+      { nicho:'painel',       secao:'apresentacao', label:'Painel de Apresentação', sub:'Slideshow executivo dos dashboards', icone:'🖥️' },
+      { nicho:'missoes',      secao:'dashboard',   label:'Dashboard Missões',     sub:'KPIs · status · tipos · campo',   icone:'🎯' },
       { nicho:'missoes',      secao:'lista',       label:'Missões',               sub:'Operações de campo',              icone:'🎯' },
       { nicho:'infra',        secao:'ordens',      label:'Ordens de Serviço',     sub:'OS e manutenções',                icone:'📝' },
       { nicho:'bi',           secao:'dashboard',   label:'Dashboard BI',          sub:'KPIs consolidados · todos nichos',icone:'🧠' },

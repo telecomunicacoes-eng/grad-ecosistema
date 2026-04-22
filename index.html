@@ -152,6 +152,21 @@
   <!-- SIDEBAR -->
   <nav class="sidebar">
 
+    <!-- ══ PAINEL DE APRESENTAÇÃO ══ -->
+    <div class="niche-group" id="niche-painel">
+      <div class="niche-header" onclick="App.toggleNiche('painel')">
+        <span class="niche-icon">🖥️</span>
+        <span class="niche-label">Painel</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="painel.apresentacao" onclick="App.navigate('painel','apresentacao')">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Apresentação
+        </a>
+      </div>
+    </div>
+
     <!-- ══ INFRAESTRUTURA ══ -->
     <div class="niche-group open" id="niche-infra">
       <div class="niche-header" onclick="App.toggleNiche('infra')">
@@ -206,6 +221,10 @@
         <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="missoes.dashboard" onclick="App.navigate('missoes','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
         <a class="nav-item nav-sub" data-route="missoes.lista" onclick="App.navigate('missoes','lista')">
           <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           Missões
@@ -392,6 +411,8 @@
 <!-- 📻 Comunicações -->
 <script src="modules/comunicacoes/issi.js"></script>
 <script src="modules/comunicacoes/comunicacoes.js"></script>
+<!-- 🖥️ Painel -->
+<script src="modules/painel/painel.js"></script>
 <!-- ⚙️ Sistema -->
 <script src="modules/system/gerenciar.js"></script>
 
