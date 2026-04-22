@@ -25,9 +25,9 @@
   --border2: rgba(255,255,255,0.20);
 
   /* Textos */
-  --text:  #f0f6ff;
-  --text2: #c4d8f0;
-  --text3: #7a9cbd;
+  --text:  #f4f9ff;
+  --text2: #daeaff;
+  --text3: #9ab8d8;
 
   /* Tipografia */
   --mono: 'IBM Plex Mono', monospace;
@@ -52,7 +52,7 @@ html, body {
   font-family: var(--sans);
   background: var(--navy);
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
