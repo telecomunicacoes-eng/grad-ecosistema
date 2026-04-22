@@ -429,14 +429,103 @@ const Gerenciar = {
     const reader = new FileReader();
     reader.onload = async e => {
       try {
-        const d = JSON.parse(e.target.result);
-        if (!confirm(`Restaurar backup de ${d.exportedAt || 'data desconhecida'}?\nIsso adicionará os dados ao Supabase.`)) return;
+        const raw = JSON.parse(e.target.result);
+        const exportedAt = raw.exportedAt || 'data desconhecida';
+        if (!confirm(`Restaurar backup de ${exportedAt}?\nIsso adicionará os dados ao Supabase.`)) return;
+
+        // Detecta formato: antigo NEBULA (BASE_SITES/REGISTROS) ou novo GRAD (sites/ocorrencias)
+        const isOldFormat = !!(raw.BASE_SITES || raw.REGISTROS);
+        Toast.show('Importando dados...', 'info');
         let ok = 0;
-        if (d.risps?.length)    { await db.from('risps').upsert(d.risps); ok++; }
-        if (d.motivos?.length)  { await db.from('motivos_falha').upsert(d.motivos); ok++; }
-        if (d.sites?.length)    { await db.from('sites').upsert(d.sites); ok++; }
-        if (d.ocorrencias?.length) { await db.from('ocorrencias').upsert(d.ocorrencias); ok++; }
-        Toast.show('Backup restaurado com sucesso!', 'success');
+
+        if (isOldFormat) {
+          // ── FORMATO ANTIGO (NEBULA/Firebase) ──────────────────
+          // 1. RISPs — array de strings
+          const rispsRaw = raw.RISPS || [];
+          if (rispsRaw.length) {
+            const payload = rispsRaw.map(r => ({ nome: typeof r === 'string' ? r : r.nome }));
+            for (const r of payload) {
+              await db.from('risps').upsert(r, { onConflict: 'nome', ignoreDuplicates: true });
+            }
+            ok++;
+          }
+
+          // 2. Motivos — array de strings
+          const motivosRaw = raw.MOTIVOS || [];
+          if (motivosRaw.length) {
+            const payload = motivosRaw.map(m => ({ descricao: typeof m === 'string' ? m : m.descricao || m.nome }));
+            for (const m of payload) {
+              await db.from('motivos_falha').upsert(m, { onConflict: 'descricao', ignoreDuplicates: true });
+            }
+            ok++;
+          }
+
+          // 3. Busca mapa RISP nome→id e motivo descricao→id
+          const { data: rispData  } = await db.from('risps').select('id,nome');
+          const { data: motivData } = await db.from('motivos_falha').select('id,descricao');
+          const rispMapNome  = Object.fromEntries((rispData  ||[]).map(r => [r.nome, r.id]));
+          const motivMapDesc = Object.fromEntries((motivData ||[]).map(m => [m.descricao, m.id]));
+
+          // 4. BASE_SITES → sites
+          const sitesRaw = raw.BASE_SITES || [];
+          if (sitesRaw.length) {
+            const payload = sitesRaw.map(s => ({
+              nome:       s.nome || `SBS-${s.sbs}`,
+              cidade:     s.cidade || null,
+              risp_id:    rispMapNome[s.risp] || null,
+              latitude:   s.lat  || null,
+              longitude:  s.lon  || null,
+              ativo:      true,
+              observacoes: [s.trafego, s.prop, s.cr].filter(Boolean).join(' · ') || null,
+            }));
+            for (let i = 0; i < payload.length; i += 50) {
+              await db.from('sites').upsert(payload.slice(i, i+50), { ignoreDuplicates: true });
+            }
+            ok++;
+          }
+
+          // 5. REGISTROS → ocorrencias (mapeia sbs → site_id pelo nome)
+          const registrosRaw = raw.REGISTROS || [];
+          if (registrosRaw.length) {
+            const { data: siteData } = await db.from('sites').select('id,nome');
+            const siteMapSbs = {};
+            (siteData||[]).forEach(s => {
+              const m = s.nome?.match(/^(\d{4})/);
+              if (m) siteMapSbs[parseInt(m[1])] = s.id;
+            });
+
+            const payload = registrosRaw.map(r => ({
+              site_id:    siteMapSbs[r.sbs] || null,
+              situacao:   r.situacao || 'Inoperante',
+              motivo_id:  motivMapDesc[r.motivo] || null,
+              inicio:     r.inicio || new Date().toISOString().slice(0,10),
+              fim:        r.conclusao && r.situacao === 'Encerrada' ? r.ts : null,
+              prazo:      r.prazo || null,
+              acao:       r.acao  || null,
+              observacoes:r.obs   || null,
+              operador:   r.operador  || null,
+              conclusao:  r.conclusao || null,
+              glpi:       r.glpi || null,
+              criado_em:  r.ts || new Date().toISOString(),
+            })).filter(o => o.site_id);
+
+            for (let i = 0; i < payload.length; i += 50) {
+              await db.from('ocorrencias').upsert(payload.slice(i, i+50), { ignoreDuplicates: true });
+            }
+            if (payload.length) ok++;
+          }
+
+          Toast.show(`Backup NEBULA importado! (${ok} coleções · ${sitesRaw.length} sites · ${registrosRaw.length} registros)`, 'success');
+
+        } else {
+          // ── FORMATO NOVO (GRAD/Supabase) ──────────────────────
+          if (raw.risps?.length)       { await db.from('risps').upsert(raw.risps); ok++; }
+          if (raw.motivos?.length)     { await db.from('motivos_falha').upsert(raw.motivos); ok++; }
+          if (raw.sites?.length)       { await db.from('sites').upsert(raw.sites); ok++; }
+          if (raw.ocorrencias?.length) { await db.from('ocorrencias').upsert(raw.ocorrencias); ok++; }
+          Toast.show('Backup restaurado com sucesso!', 'success');
+        }
+
         await Gerenciar._renderSites();
       } catch (err) { Toast.show('Erro ao restaurar: ' + err.message, 'error'); }
       if (input.value !== undefined) input.value = '';
