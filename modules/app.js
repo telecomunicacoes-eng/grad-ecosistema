@@ -17,8 +17,10 @@ const App = {
       relatorio:  el => Relatorio.render(el),
       mapa:       el => Mapa.render(el),
       base:       el => Base.render(el),
-      missoes:    el => Missoes.render(el),
       ordens:     el => Ordens.render(el),
+    },
+    missoes: {
+      lista:      el => Missoes.render(el),
     },
     bi: {
       dashboard:  el => Inteligencia.render(el),
@@ -239,7 +241,7 @@ const App = {
       { nicho:'infra',        secao:'relatorio',   label:'Relatório Infra',       sub:'PDF · Excel · métricas',          icone:'📄' },
       { nicho:'infra',        secao:'mapa',        label:'Mapa de ERBs',          sub:'Mapa interativo por RISP',        icone:'🗺️' },
       { nicho:'infra',        secao:'base',        label:'Base de Sites',         sub:'Cadastro de ERBs · CSV',          icone:'📡' },
-      { nicho:'infra',        secao:'missoes',     label:'Missões',               sub:'Operações de campo',              icone:'🎯' },
+      { nicho:'missoes',      secao:'lista',       label:'Missões',               sub:'Operações de campo',              icone:'🎯' },
       { nicho:'infra',        secao:'ordens',      label:'Ordens de Serviço',     sub:'OS e manutenções',                icone:'📝' },
       { nicho:'bi',           secao:'dashboard',   label:'Dashboard BI',          sub:'KPIs consolidados · todos nichos',icone:'🧠' },
       { nicho:'bi',           secao:'registros',   label:'Análises BI',           sub:'Cruzamentos · correlações',       icone:'📊' },

@@ -190,13 +190,24 @@
           <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M12 8v13"/><path d="M5 12H2a10 10 0 0020 0h-3"/></svg>
           Base de Sites
         </a>
-        <a class="nav-item nav-sub nav-extra" data-route="infra.missoes" onclick="App.navigate('infra','missoes')">
-          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          Missões
-        </a>
         <a class="nav-item nav-sub nav-extra" data-route="infra.ordens" onclick="App.navigate('infra','ordens')">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Ordens de Serviço
+        </a>
+      </div>
+    </div>
+
+    <!-- ══ MISSÕES ══ -->
+    <div class="niche-group" id="niche-missoes">
+      <div class="niche-header" onclick="App.toggleNiche('missoes')">
+        <span class="niche-icon">🎯</span>
+        <span class="niche-label">Missões</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="missoes.lista" onclick="App.navigate('missoes','lista')">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Missões
         </a>
       </div>
     </div>
@@ -369,7 +380,7 @@
 <script src="modules/infra/alertas.js"></script>
 <script src="modules/infra/relatorio.js"></script>
 <script src="modules/infra/base.js"></script>
-<script src="modules/infra/missoes.js"></script>
+<script src="modules/missoes/missoes.js"></script>
 <script src="modules/infra/ordens.js"></script>
 <!-- 🧠 Inteligência / BI -->
 <script src="modules/bi/inteligencia.js"></script>
