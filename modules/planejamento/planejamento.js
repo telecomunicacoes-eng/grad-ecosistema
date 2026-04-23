@@ -154,6 +154,7 @@ const Planejamento = {
             <div id="plan-footer-ctrl">
               <span style="font-size:10px;color:var(--text3);letter-spacing:.06em">CAMADAS:</span>
               <button class="pfc-btn active" id="pfc-sites"  onclick="Planejamento._toggleSites()">📡 Sites</button>
+              <button class="pfc-btn"        id="pfc-global" onclick="Planejamento._verGlobal()">🗺️ Global</button>
               <button class="pfc-btn"        id="pfc-macro"  onclick="Planejamento._verMacro()">🌐 Macro</button>
               <button class="pfc-btn"        id="pfc-limpar" onclick="Planejamento._limparManchas()">✕ Limpar manchas</button>
               <div class="pfc-sep"></div>
@@ -457,6 +458,8 @@ const Planejamento = {
       try { Planejamento._map.removeLayer(ov); } catch {}
     });
     Planejamento._manchasAtivas.clear();
+    document.getElementById('pfc-global')?.classList.remove('active');
+    document.getElementById('pfc-macro')?.classList.remove('active');
   },
 
   _adicionarManchas(overlays) {
@@ -500,6 +503,41 @@ const Planejamento = {
       Planejamento._adicionarManchas(manchas);
       Toast.show(`Cobertura RISP ${num} — ${manchas.length} camada(s)`, 'success');
     }
+  },
+
+  // Visão global — manchas de RISP (cobertura de toda a rede por RISP)
+  _verGlobal() {
+    if (!Planejamento._kmzLoaded) { Toast.show('Aguarde — manchas ainda carregando...','warn'); return; }
+    const btn = document.getElementById('pfc-global');
+    const jaAtivo = btn?.classList.contains('active');
+
+    if (jaAtivo) {
+      Planejamento._limparManchas();
+      btn?.classList.remove('active');
+      document.getElementById('pfc-macro')?.classList.remove('active');
+      return;
+    }
+
+    Planejamento._limparManchas();
+    document.getElementById('pfc-macro')?.classList.remove('active');
+
+    // Junta todas as manchas por RISP
+    const todasRisp = Object.values(Planejamento._manchas.porRisp).flat();
+    if (!todasRisp.length) {
+      // Fallback: se não houver manchas por RISP, usa todas as individuais
+      Planejamento._manchas.todas.forEach(ov => ov.setOpacity(0.55));
+      Planejamento._adicionarManchas(Planejamento._manchas.todas);
+      btn?.classList.add('active');
+      Planejamento._map.setView([-13.5,-56.5],6,{animate:true});
+      Toast.show(`Visão global — ${Planejamento._manchas.todas.length} manchas individuais`, 'success');
+      return;
+    }
+
+    todasRisp.forEach(ov => ov.setOpacity(0.65));
+    Planejamento._adicionarManchas(todasRisp);
+    btn?.classList.add('active');
+    Planejamento._map.setView([-13.5,-56.5],6,{animate:true});
+    Toast.show(`Visão global — ${todasRisp.length} manchas de RISP`, 'success');
   },
 
   // Visão macro — todas as manchas individuais
