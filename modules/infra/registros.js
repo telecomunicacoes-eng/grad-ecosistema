@@ -255,6 +255,7 @@ const Ocorrencias = {
             <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
               <button class="btn btn-ghost btn-sm perm-edit" title="Editar" onclick="Ocorrencias.editar('${o.id}')">✎</button>
               <button class="btn btn-success btn-sm perm-edit" title="Dar baixa" onclick="Ocorrencias.darBaixa('${o.id}')">✔ Baixa</button>
+              <button class="btn btn-ghost btn-sm perm-admin" title="Apagar" onclick="Ocorrencias.apagar('${o.id}')" style="color:#f87171;border-color:rgba(248,113,113,.3)">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -437,9 +438,10 @@ const Ocorrencias = {
         ${o.consideracoes ? `<div><label class="form-label">Considerações</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap;background:rgba(255,255,255,.03);padding:8px;border-radius:6px">${o.consideracoes}</div></div>` : ''}
       </div>`,
       [
-        { label: 'Fechar',    class: 'btn-ghost',   onclick: 'Modal.close()' },
-        { label: '✎ Editar',  class: 'btn-primary perm-edit', onclick: `Modal.close();Ocorrencias.editar('${id}')` },
-        { label: '✔ Dar Baixa', class: 'btn-success perm-edit', onclick: `Modal.close();Ocorrencias.darBaixa('${id}')` }
+        { label: 'Fechar',      class: 'btn-ghost',                      onclick: 'Modal.close()' },
+        { label: '✎ Editar',   class: 'btn-primary perm-edit',           onclick: `Modal.close();Ocorrencias.editar('${id}')` },
+        { label: '✔ Dar Baixa',class: 'btn-success perm-edit',           onclick: `Modal.close();Ocorrencias.darBaixa('${id}')` },
+        { label: '🗑 Apagar',  class: 'btn-ghost perm-admin',            onclick: `Modal.close();Ocorrencias.apagar('${id}')`, style:'color:#f87171' }
       ]
     );
   },
@@ -607,6 +609,44 @@ const Ocorrencias = {
       App._updateAlertBadge && App._updateAlertBadge();
     } catch (err) {
       Toast.show(err.message || 'Erro ao dar baixa', 'error');
+    }
+  },
+
+  // ── APAGAR ───────────────────────────────────────────────────────────────
+  apagar(id) {
+    const o = Ocorrencias._data.find(x => x.id === id);
+    Modal.open('Apagar Ocorrência', `
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:12px;display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:20px">⚠️</span>
+          <div>
+            <div style="color:#f87171;font-weight:700;font-size:13px;margin-bottom:3px">Ação irreversível</div>
+            <div style="color:var(--text2);font-size:12px">Esta ocorrência será permanentemente removida do sistema.</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text2)">
+          <strong style="color:var(--text)">${o?.site?.nome || id}</strong><br>
+          <span style="font-size:11px;color:var(--text3)">${o?.site?.risp?.nome||'—'} · ${o?.motivo?.descricao||'Sem motivo'} · ${diffDays(o?.inicio)} dias</span>
+        </div>
+        <div style="font-size:13px;color:var(--text3)">Tem certeza que deseja apagar?</div>
+      </div>`,
+      [
+        { label: 'Cancelar',       class: 'btn-ghost',   onclick: 'Modal.close()' },
+        { label: '🗑 Sim, apagar', class: 'btn-danger',  onclick: `Ocorrencias.confirmarApagar('${id}')` }
+      ]
+    );
+  },
+
+  async confirmarApagar(id) {
+    try {
+      const { error } = await db.from('ocorrencias').delete().eq('id', id);
+      if (error) throw error;
+      Modal.close();
+      Toast.show('Ocorrência apagada', 'success');
+      await Ocorrencias.load();
+      App._updateAlertBadge && App._updateAlertBadge();
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao apagar', 'error');
     }
   }
 };
