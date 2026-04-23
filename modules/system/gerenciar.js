@@ -318,50 +318,67 @@ const Gerenciar = {
       const lines = text.split(/\r?\n/).filter(l => l.trim());
       const fb = document.getElementById('import-feedback');
       if (lines.length < 2) { if (fb) fb.innerHTML = '<span style="color:#f87171">⚠ Arquivo vazio ou sem dados.</span>'; return; }
-      const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+
+      const sep  = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
       const rawH = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g,'').replace(/[^a-z0-9]/g,'_'));
+
       const col = {
-        nome:    rawH.findIndex(h => ['nome','nome_do_local','local','site','descricao'].some(k => h.includes(k))),
-        cidade:  rawH.findIndex(h => ['cidade','municipio','city'].some(k => h.includes(k))),
-        risp:    rawH.findIndex(h => h.includes('risp')),
-        lat:     rawH.findIndex(h => h === 'lat' || h.includes('latit')),
-        lon:     rawH.findIndex(h => h === 'lon' || h === 'lng' || h.includes('longit')),
-        ativo:   rawH.findIndex(h => h.includes('ativo')),
+        nome:         rawH.findIndex(h => ['nome','nome_do_local','local','site','descricao'].some(k => h.includes(k))),
+        cidade:       rawH.findIndex(h => ['cidade','municipio','city'].some(k => h.includes(k))),
+        risp:         rawH.findIndex(h => h.includes('risp')),
+        cr:           rawH.findIndex(h => h === 'cr' || h.includes('_cr') || h.startsWith('cr_') || h === 'cr'),
+        trafego:      rawH.findIndex(h => h.includes('trafego') || h.includes('trafico') || h.includes('tipo')),
+        proprietario: rawH.findIndex(h => h.includes('prop') || h.includes('proprietar') || h.includes('dono')),
+        patrimonio:   rawH.findIndex(h => h.includes('patrimonio') || h.includes('patrimônio') || h.includes('pat_')),
+        lat:          rawH.findIndex(h => h === 'lat' || h.includes('latit')),
+        lon:          rawH.findIndex(h => h === 'lon' || h === 'lng' || h.includes('longit')),
       };
 
       const risps = await dbQuery(d => d.from('risps').select('id,nome')) || [];
       const getRispId = nome => {
-        const norm = nome.replace(/^risp\s*/i,'RISP ').replace(/RISP(\d)/,'RISP $1').trim();
+        if (!nome) return null;
+        const norm = nome.replace(/^risp\s*/i, 'RISP ').replace(/RISP(\d)/, 'RISP $1').trim();
         return risps.find(r => r.nome === norm || r.nome.toLowerCase() === norm.toLowerCase())?.id || null;
       };
 
-      let added = 0, skipped = 0;
-      const get = (cols, key) => col[key] >= 0 ? (cols[col[key]] || '').replace(/^"|"$/g,'').trim() : '';
+      let added = 0, skipped = 0, erros = [];
+      const get = (cols, key) => col[key] >= 0 ? (cols[col[key]] || '').replace(/^"|"$/g, '').trim() : '';
 
       for (let i = 1; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
         const cols = Gerenciar._parseCSVLine(lines[i], sep);
-        const nome = get(cols,'nome');
-        if (!nome) { skipped++; continue; }
-        const risp_id  = getRispId(get(cols,'risp'));
-        const lat      = parseFloat(get(cols,'lat').replace(',','.')) || null;
-        const lon      = parseFloat(get(cols,'lon').replace(',','.')) || null;
-        const payload  = {
+        const nome = get(cols, 'nome');
+        if (!nome) { skipped++; erros.push(`Linha ${i+1}: Nome vazio`); continue; }
+
+        const latRaw = get(cols,'lat').replace(',','.');
+        const lonRaw = get(cols,'lon').replace(',','.');
+        const lat    = latRaw ? parseFloat(latRaw) : null;
+        const lon    = lonRaw ? parseFloat(lonRaw) : null;
+
+        const cr           = get(cols,'cr')           || '';
+        const trafego      = get(cols,'trafego')      || 'BT';
+        const proprietario = get(cols,'proprietario') || 'SESP';
+        const patrimonio   = get(cols,'patrimonio')   || '';
+
+        const payload = {
           nome,
-          cidade:    get(cols,'cidade') || null,
-          risp_id,
-          latitude:  isNaN(lat)  ? null : lat,
-          longitude: isNaN(lon)  ? null : lon,
-          ativo:     true,
+          cidade:      get(cols,'cidade') || null,
+          risp_id:     getRispId(get(cols,'risp')),
+          latitude:    latRaw && !isNaN(lat)  ? lat : null,
+          longitude:   lonRaw && !isNaN(lon)  ? lon : null,
+          ativo:       true,
+          observacoes: Gerenciar._serializeSiteExtras(cr, trafego, proprietario, patrimonio),
         };
+
         try {
           const { error } = await db.from('sites').insert(payload);
-          if (error && error.code !== '23505') { skipped++; continue; }
           if (error?.code === '23505') { skipped++; continue; }
+          if (error) { skipped++; erros.push(`Linha ${i+1}: ${error.message}`); continue; }
           added++;
         } catch { skipped++; }
       }
-      const msg = `✓ ${added} site(s) importado(s). ${skipped} ignorado(s).`;
+
+      const msg = `✓ ${added} site(s) importado(s). ${skipped} ignorado(s).${erros.length ? ' Erros: ' + erros.slice(0,3).join('; ') : ''}`;
       if (fb) fb.innerHTML = `<span style="color:${added > 0 ? '#34d399' : '#f87171'}">${msg}</span>`;
       if (added > 0) {
         Toast.show(`${added} site(s) importado(s)`, 'success');
@@ -373,7 +390,12 @@ const Gerenciar = {
   },
 
   _downloadCSVTemplate() {
-    const csv = 'NOME;CIDADE;RISP;LAT;LON\nSBS-001 Cuiabá Centro;Cuiabá;RISP 1;-15.5989;-56.0949\nSBS-012 Rondonópolis;Rondonópolis;RISP 5;-16.4699;-54.6364';
+    const csv = [
+      'NOME;CIDADE;RISP;CR;TRAFEGO;PROPRIETARIO;PATRIMONIO;LAT;LON',
+      '9200 – Cáceres Centro;Cáceres;RISP 1;1° CR;BT;SESP;PT-2024-0001;-16.0761;-57.6811',
+      '9201 – Alta Floresta;Alta Floresta;RISP 9;9° CR;BT;SESP;;-9.8754;-56.0861',
+      '2010 – PRF Primavera do Leste;Primavera do Leste;RISP 11;11° CR;BT;PRF;;;',
+    ].join('\n');
     Gerenciar._dlFile('data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv), 'GRAD_modelo_importacao.csv');
   },
 
@@ -382,10 +404,16 @@ const Gerenciar = {
     Toast.show('Gerando BASE_MESTRE…', 'info');
     try {
       const sites = await dbQuery(d => d.from('sites').select('*,risp:risps(nome)').order('nome')) || [];
-      const rows = sites.map(s => [
-        s.nome, s.cidade, s.risp?.nome||'', s.latitude||'', s.longitude||'', s.ativo?'Sim':'Não'
-      ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
-      const csv = ['NOME,CIDADE,RISP,LAT,LON,ATIVO', ...rows].join('\n');
+      const rows = sites.map(s => {
+        const ex = Gerenciar._parseSiteExtras(s);
+        return [
+          s.nome, s.cidade||'', s.risp?.nome||'',
+          ex.cr||'', ex.trafego||'', ex.proprietario||'', ex.patrimonio||'',
+          s.latitude!=null?s.latitude:'', s.longitude!=null?s.longitude:'',
+          s.ativo?'Sim':'Não'
+        ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',');
+      });
+      const csv = ['NOME,CIDADE,RISP,CR,TRAFEGO,PROPRIETARIO,PATRIMONIO,LAT,LON,ATIVO', ...rows].join('\n');
       Gerenciar._dlFile('data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv),
         `GRAD_BASE_MESTRE_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (err) { Toast.show(err.message, 'error'); }
@@ -545,169 +573,308 @@ const Gerenciar = {
   },
 
   // ══════════════════════════════════════
-  // SITES
+  // SITES — Gerenciamento de Infraestrutura
   // ══════════════════════════════════════
+  _editingSiteId: null,   // null = modo cadastro, uuid = modo edição
+
+  // Lê extras (CR, Tráfego, Prop, Patrimônio) do campo observacoes (JSON)
+  _parseSiteExtras(s) {
+    try {
+      if (s.observacoes && s.observacoes.trimStart().startsWith('{')) {
+        return JSON.parse(s.observacoes);
+      }
+    } catch {}
+    return { cr: '', trafego: 'BT', proprietario: 'SESP', patrimonio: '', obs_livre: s.observacoes || '' };
+  },
+
+  // Serializa extras de volta para observacoes
+  _serializeSiteExtras(cr, trafego, proprietario, patrimonio) {
+    const obj = {};
+    if (cr)           obj.cr           = cr;
+    if (trafego)      obj.trafego      = trafego;
+    if (proprietario) obj.proprietario = proprietario;
+    if (patrimonio)   obj.patrimonio   = patrimonio;
+    return Object.keys(obj).length ? JSON.stringify(obj) : null;
+  },
+
   async _renderSites() {
     const el = document.getElementById('gerenciar-conteudo');
     el.innerHTML = '<div style="display:flex;justify-content:center;padding:40px"><div class="spinner"></div></div>';
     try {
-      const sites = await dbQuery(d =>
-        d.from('sites').select('*, risp:risps(nome)').order('nome')
-      );
-      const risps = await dbQuery(d => d.from('risps').select('id,nome').order('nome'));
-      Gerenciar._sites = sites || [];
-      Gerenciar._risps = risps || [];
+      const [sites, risps] = await Promise.all([
+        dbQuery(d => d.from('sites').select('*, risp:risps(nome)').order('nome')),
+        dbQuery(d => d.from('risps').select('id,nome').order('nome'))
+      ]);
+      Gerenciar._sites      = sites  || [];
+      Gerenciar._risps      = risps  || [];
+      Gerenciar._editingSiteId = null;
 
       const rispOpts = (risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
 
       el.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <input class="form-input" id="ger-site-busca" placeholder="Buscar site..." oninput="Gerenciar._filtrarSites()" style="width:250px">
-          <button class="btn btn-primary btn-sm" onclick="Gerenciar.novoSite()">+ Novo Site</button>
+        <!-- ── FORMULÁRIO INLINE ────────────── -->
+        <div class="card" id="site-form-card" style="margin-bottom:14px;border-color:rgba(36,133,245,.25)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="card-title" id="sf-form-title">Adicionar novo site</div>
+            <span id="sf-edit-badge" style="display:none;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:6px;padding:3px 12px;font-size:12px;font-family:var(--mono);color:#fbbf24;letter-spacing:.06em">✎ MODO EDIÇÃO</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
+            <div>
+              <label class="form-label">Nome do site *</label>
+              <input class="form-input" id="sf-nome" placeholder="Nome do local">
+            </div>
+            <div>
+              <label class="form-label">Cidade</label>
+              <input class="form-input" id="sf-cidade" placeholder="Cidade">
+            </div>
+            <div>
+              <label class="form-label">RISP</label>
+              <select class="form-select" id="sf-risp"><option value="">—</option>${rispOpts}</select>
+            </div>
+            <div>
+              <label class="form-label">CR</label>
+              <input class="form-input" id="sf-cr" placeholder="Ex: 7° CR">
+            </div>
+            <div>
+              <label class="form-label">Tráfego</label>
+              <select class="form-select" id="sf-trafego">
+                <option>BT</option><option>MT</option><option>AT</option>
+                <option>LINK</option><option>INATIVO</option><option>repetidora</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Proprietário</label>
+              <select class="form-select" id="sf-prop">
+                <option>SESP</option><option>GEFRON</option><option>PRF</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Latitude</label>
+              <input class="form-input" id="sf-lat" placeholder="-15.6335" type="text">
+            </div>
+            <div>
+              <label class="form-label">Longitude</label>
+              <input class="form-input" id="sf-lng" placeholder="-56.0922" type="text">
+            </div>
+            <div class="perm-admin">
+              <label class="form-label">Patrimônio <span style="color:var(--amber);font-size:10px">🔒 Admin</span></label>
+              <input class="form-input" id="sf-patrimonio" placeholder="Ex: PT-2024-0001">
+            </div>
+            <div>
+              <label class="form-label">Status</label>
+              <select class="form-select" id="sf-ativo">
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary" id="sf-submit-btn" onclick="Gerenciar.salvarSite()">+ Cadastrar site</button>
+            <button class="btn btn-ghost" id="sf-cancel-btn" style="display:none" onclick="Gerenciar._cancelarEdicaoSite()">Cancelar edição</button>
+            <span id="sf-feedback" style="font-size:12px;color:var(--text3);flex:1"></span>
+          </div>
         </div>
+
+        <!-- ── FILTROS + TABELA ──────────────── -->
         <div class="card" style="padding:0">
-          <div class="table-wrap" style="border:none">
-            <table id="ger-sites-tbl">
-              <thead><tr><th>Nome</th><th>RISP</th><th>Latitude</th><th>Longitude</th><th>Ativo</th><th>Ações</th></tr></thead>
+          <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+            <input class="form-input" id="ger-site-busca" placeholder="Buscar nome, cidade..." oninput="Gerenciar._filtrarSites()" style="width:220px">
+            <select class="form-select" id="ger-site-risp" onchange="Gerenciar._filtrarSites()" style="width:160px">
+              <option value="">Todas as RISPs</option>
+              ${(risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('')}
+            </select>
+            <select class="form-select" id="ger-site-prop" onchange="Gerenciar._filtrarSites()" style="width:130px">
+              <option value="">Todos proprietários</option>
+              <option>SESP</option><option>GEFRON</option><option>PRF</option>
+            </select>
+            <select class="form-select" id="ger-site-ativo" onchange="Gerenciar._filtrarSites()" style="width:120px">
+              <option value="">Todos status</option>
+              <option value="true">Ativos</option>
+              <option value="false">Inativos</option>
+            </select>
+            <div style="margin-left:auto;font-size:13px;color:var(--text3)" id="ger-site-count"></div>
+          </div>
+          <div class="table-wrap" style="border:none;max-height:520px;overflow-y:auto">
+            <table id="ger-sites-tbl" class="table">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>Cidade</th><th>RISP</th><th>CR</th>
+                  <th>Tráfego</th><th>Prop.</th><th>Patrimônio</th>
+                  <th>Coords</th><th>Status</th><th></th>
+                </tr>
+              </thead>
               <tbody id="ger-sites-body"></tbody>
             </table>
           </div>
         </div>`;
 
       Gerenciar._filtrarSites();
-    } catch {}
+    } catch (err) {
+      document.getElementById('gerenciar-conteudo').innerHTML =
+        `<div class="empty-state"><div class="empty-state-title">Erro ao carregar sites</div><div class="empty-state-sub">${err.message||''}</div></div>`;
+    }
   },
 
   _filtrarSites() {
-    const busca  = (document.getElementById('ger-site-busca')?.value || '').toLowerCase();
-    const sites  = (Gerenciar._sites || []).filter(s =>
-      !busca || s.nome?.toLowerCase().includes(busca) || s.risp?.nome?.toLowerCase().includes(busca)
-    );
+    const busca  = (document.getElementById('ger-site-busca')?.value  || '').toLowerCase();
+    const rispF  =  document.getElementById('ger-site-risp')?.value   || '';
+    const propF  = (document.getElementById('ger-site-prop')?.value   || '').toLowerCase();
+    const ativoF =  document.getElementById('ger-site-ativo')?.value  || '';
+
+    const filtered = (Gerenciar._sites || []).filter(s => {
+      const ex = Gerenciar._parseSiteExtras(s);
+      if (rispF  && s.risp_id !== rispF) return false;
+      if (propF  && (ex.proprietario||'').toLowerCase() !== propF) return false;
+      if (ativoF !== '' && String(s.ativo) !== ativoF) return false;
+      if (busca  && !(s.nome?.toLowerCase().includes(busca) || s.cidade?.toLowerCase().includes(busca))) return false;
+      return true;
+    });
+
+    const cnt = document.getElementById('ger-site-count');
+    if (cnt) cnt.textContent = `${filtered.length} site${filtered.length!==1?'s':''}`;
+
     const tbody = document.getElementById('ger-sites-body');
     if (!tbody) return;
-    tbody.innerHTML = sites.map(s => `
-      <tr>
-        <td><strong style="color:var(--text)">${s.nome}</strong></td>
+
+    tbody.innerHTML = filtered.map(s => {
+      const ex = Gerenciar._parseSiteExtras(s);
+      const hasCoords = s.latitude != null && s.longitude != null;
+      const coordLabel = hasCoords
+        ? `<span style="font-size:11px;color:#34d399;font-family:var(--mono)" title="${s.latitude}, ${s.longitude}">✓ coord</span>`
+        : `<span style="font-size:11px;color:var(--text3);font-family:var(--mono)">— sem coord</span>`;
+      const patrimonioCell = ex.patrimonio
+        ? `<span style="font-family:var(--mono);font-size:11px;color:#fbbf24;background:rgba(251,191,36,.1);padding:2px 7px;border-radius:4px;border:1px solid rgba(251,191,36,.3)">${ex.patrimonio}</span>`
+        : `<span style="color:var(--text3);font-size:11px">—</span>`;
+      const trafBadge = ex.trafego
+        ? `<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.2)">${ex.trafego}</span>`
+        : '—';
+      const isEditing = Gerenciar._editingSiteId === s.id;
+
+      return `<tr id="ger-site-row-${s.id}" style="${isEditing?'background:rgba(245,158,11,.07)':''}">
+        <td><strong style="color:var(--text)">${s.nome||'—'}</strong></td>
+        <td style="color:var(--text2)">${s.cidade||'—'}</td>
         <td><span class="risp-badge">${s.risp?.nome||'—'}</span></td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${s.latitude||'—'}</td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${s.longitude||'—'}</td>
+        <td style="color:var(--text3);font-size:12px">${ex.cr||'—'}</td>
+        <td>${trafBadge}</td>
+        <td style="color:var(--text3);font-size:12px">${ex.proprietario||'—'}</td>
+        <td class="perm-admin">${patrimonioCell}</td>
+        <td>${coordLabel}</td>
         <td><span class="badge ${s.ativo?'badge-green':'badge-gray'}">${s.ativo?'Ativo':'Inativo'}</span></td>
-        <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm" onclick="Gerenciar.editarSite('${s.id}')">✎</button>
-            <button class="btn btn-danger btn-sm" onclick="Gerenciar.toggleSite('${s.id}',${!s.ativo})">${s.ativo?'Desativar':'Ativar'}</button>
+        <td style="white-space:nowrap">
+          <div class="perm-edit" style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="Gerenciar.editarSite('${s.id}')">✎ editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="Gerenciar.toggleSite('${s.id}',${!s.ativo})">${s.ativo?'Desativar':'Ativar'}</button>
           </div>
         </td>
-      </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">Nenhum site</td></tr>';
+      </tr>`;
+    }).join('') || '<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3)">Nenhum site encontrado</td></tr>';
   },
 
-  novoSite() {
-    const rispOpts = (Gerenciar._risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
-    Modal.open('Novo Site', `
-      <div class="form-grid-2">
-        <div style="grid-column:1/-1">
-          <label class="form-label">Nome do site *</label>
-          <input class="form-input" id="sf-nome" placeholder="Nome do site">
-        </div>
-        <div>
-          <label class="form-label">RISP</label>
-          <select class="form-select" id="sf-risp"><option value="">—</option>${rispOpts}</select>
-        </div>
-        <div>
-          <label class="form-label">Ativo</label>
-          <select class="form-select" id="sf-ativo">
-            <option value="true" selected>Sim</option>
-            <option value="false">Não</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">Latitude</label>
-          <input class="form-input" id="sf-lat" placeholder="-15.6014" type="number" step="0.000001">
-        </div>
-        <div>
-          <label class="form-label">Longitude</label>
-          <input class="form-input" id="sf-lng" placeholder="-56.0979" type="number" step="0.000001">
-        </div>
-        <div style="grid-column:1/-1">
-          <label class="form-label">Observações</label>
-          <textarea class="form-textarea" id="sf-obs" rows="2"></textarea>
-        </div>
-      </div>`,
-      [
-        { label: 'Cancelar', class: 'btn-ghost',  onclick: 'Modal.close()' },
-        { label: 'Cadastrar', class: 'btn-primary', onclick: 'Gerenciar.salvarSite()' }
-      ]
-    );
+  _cancelarEdicaoSite() {
+    Gerenciar._editingSiteId = null;
+    // Limpa formulário
+    ['sf-nome','sf-cidade','sf-cr','sf-lat','sf-lng','sf-patrimonio'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const sfRisp = document.getElementById('sf-risp'); if (sfRisp) sfRisp.value = '';
+    const sfTraf = document.getElementById('sf-trafego'); if (sfTraf) sfTraf.value = 'BT';
+    const sfProp = document.getElementById('sf-prop'); if (sfProp) sfProp.value = 'SESP';
+    const sfAtiv = document.getElementById('sf-ativo'); if (sfAtiv) sfAtiv.value = 'true';
+    document.getElementById('sf-feedback').textContent = '';
+    document.getElementById('sf-form-title').textContent = 'Adicionar novo site';
+    document.getElementById('sf-edit-badge').style.display = 'none';
+    document.getElementById('sf-submit-btn').textContent = '+ Cadastrar site';
+    document.getElementById('sf-cancel-btn').style.display = 'none';
+    // Remove highlight
+    document.querySelectorAll('[id^="ger-site-row-"]').forEach(r => r.style.background = '');
   },
 
-  async salvarSite(id = null) {
+  editarSite(id) {
+    const s = (Gerenciar._sites || []).find(x => x.id === id);
+    if (!s) return;
+    const ex = Gerenciar._parseSiteExtras(s);
+
+    Gerenciar._editingSiteId = id;
+
+    // Preenche formulário
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+    set('sf-nome',       s.nome || '');
+    set('sf-cidade',     s.cidade || '');
+    set('sf-cr',         ex.cr || '');
+    set('sf-lat',        s.latitude  != null ? s.latitude  : '');
+    set('sf-lng',        s.longitude != null ? s.longitude : '');
+    set('sf-patrimonio', ex.patrimonio || '');
+
+    const sfRisp = document.getElementById('sf-risp'); if (sfRisp) sfRisp.value = s.risp_id || '';
+    const sfTraf = document.getElementById('sf-trafego'); if (sfTraf) sfTraf.value = ex.trafego || 'BT';
+    const sfProp = document.getElementById('sf-prop'); if (sfProp) sfProp.value = ex.proprietario || 'SESP';
+    const sfAtiv = document.getElementById('sf-ativo'); if (sfAtiv) sfAtiv.value = String(s.ativo !== false);
+
+    // Modo edição
+    document.getElementById('sf-form-title').textContent = `Editando: ${s.nome}`;
+    document.getElementById('sf-edit-badge').style.display = '';
+    document.getElementById('sf-submit-btn').textContent = '💾 Salvar alteração';
+    document.getElementById('sf-cancel-btn').style.display = '';
+    document.getElementById('sf-feedback').textContent = '';
+
+    // Highlight linha e scroll ao formulário
+    document.querySelectorAll('[id^="ger-site-row-"]').forEach(r => r.style.background = '');
+    const row = document.getElementById(`ger-site-row-${id}`);
+    if (row) row.style.background = 'rgba(245,158,11,.07)';
+    document.getElementById('site-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  async salvarSite() {
+    const id   = Gerenciar._editingSiteId;
     const nome = document.getElementById('sf-nome')?.value?.trim();
-    if (!nome) { Toast.show('Informe o nome do site', 'error'); return; }
+    const fb   = document.getElementById('sf-feedback');
+    if (!nome) {
+      if (fb) { fb.textContent = '⚠ Informe o nome do site.'; fb.style.color = '#f87171'; }
+      Toast.show('Informe o nome do site', 'error');
+      return;
+    }
+
+    const latRaw = document.getElementById('sf-lat')?.value?.trim().replace(',', '.');
+    const lngRaw = document.getElementById('sf-lng')?.value?.trim().replace(',', '.');
+    const lat    = latRaw  ? parseFloat(latRaw)  : null;
+    const lng    = lngRaw  ? parseFloat(lngRaw)  : null;
+
+    if (latRaw && isNaN(lat)) { if (fb) { fb.textContent = '⚠ Latitude inválida. Use decimal: -15.6335'; fb.style.color = '#f87171'; } return; }
+    if (lngRaw && isNaN(lng)) { if (fb) { fb.textContent = '⚠ Longitude inválida. Use decimal: -56.0922'; fb.style.color = '#f87171'; } return; }
+
+    const cr           = document.getElementById('sf-cr')?.value?.trim()          || '';
+    const trafego      = document.getElementById('sf-trafego')?.value             || 'BT';
+    const proprietario = document.getElementById('sf-prop')?.value                || 'SESP';
+    const patrimonio   = document.getElementById('sf-patrimonio')?.value?.trim()   || '';
+
     const payload = {
       nome,
-      risp_id:     document.getElementById('sf-risp')?.value || null,
+      cidade:      document.getElementById('sf-cidade')?.value?.trim()  || null,
+      risp_id:     document.getElementById('sf-risp')?.value            || null,
       ativo:       document.getElementById('sf-ativo')?.value !== 'false',
-      latitude:    parseFloat(document.getElementById('sf-lat')?.value) || null,
-      longitude:   parseFloat(document.getElementById('sf-lng')?.value) || null,
-      observacoes: document.getElementById('sf-obs')?.value?.trim() || null,
+      latitude:    isNaN(lat)  ? null : lat,
+      longitude:   isNaN(lng)  ? null : lng,
+      observacoes: Gerenciar._serializeSiteExtras(cr, trafego, proprietario, patrimonio),
     };
+
     try {
       if (id) {
         const { error } = await db.from('sites').update(payload).eq('id', id);
         if (error) throw error;
         await Audit.editou('sites', id, null, payload);
+        Toast.show(`✓ Site "${nome}" atualizado`, 'success');
       } else {
         const { data, error } = await db.from('sites').insert(payload).select().single();
         if (error) throw error;
         await Audit.criou('sites', data.id, data);
+        Toast.show(`✓ Site "${nome}" cadastrado`, 'success');
       }
-      Modal.close();
-      Toast.show('Site salvo', 'success');
+      Gerenciar._cancelarEdicaoSite();
       await Gerenciar._renderSites();
     } catch (err) {
+      if (fb) { fb.textContent = 'Erro: ' + (err.message || 'desconhecido'); fb.style.color = '#f87171'; }
       Toast.show(err.message || 'Erro ao salvar', 'error');
     }
-  },
-
-  editarSite(id) {
-    const s       = Gerenciar._sites.find(x => x.id === id);
-    if (!s) return;
-    const rispOpts = (Gerenciar._risps||[]).map(r=>`<option value="${r.id}" ${r.id===s.risp_id?'selected':''}>${r.nome}</option>`).join('');
-    Modal.open('Editar Site', `
-      <div class="form-grid-2">
-        <div style="grid-column:1/-1">
-          <label class="form-label">Nome *</label>
-          <input class="form-input" id="sf-nome" value="${s.nome||''}">
-        </div>
-        <div>
-          <label class="form-label">RISP</label>
-          <select class="form-select" id="sf-risp"><option value="">—</option>${rispOpts}</select>
-        </div>
-        <div>
-          <label class="form-label">Ativo</label>
-          <select class="form-select" id="sf-ativo">
-            <option value="true" ${s.ativo?'selected':''}>Sim</option>
-            <option value="false" ${!s.ativo?'selected':''}>Não</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">Latitude</label>
-          <input class="form-input" id="sf-lat" value="${s.latitude||''}" type="number" step="0.000001">
-        </div>
-        <div>
-          <label class="form-label">Longitude</label>
-          <input class="form-input" id="sf-lng" value="${s.longitude||''}" type="number" step="0.000001">
-        </div>
-        <div style="grid-column:1/-1">
-          <label class="form-label">Observações</label>
-          <textarea class="form-textarea" id="sf-obs" rows="2">${s.observacoes||''}</textarea>
-        </div>
-      </div>`,
-      [
-        { label: 'Cancelar', class: 'btn-ghost',  onclick: 'Modal.close()' },
-        { label: 'Salvar',   class: 'btn-primary', onclick: `Gerenciar.salvarSite('${id}')` }
-      ]
-    );
   },
 
   async toggleSite(id, ativo) {
@@ -715,7 +882,7 @@ const Gerenciar = {
       const { error } = await db.from('sites').update({ ativo }).eq('id', id);
       if (error) throw error;
       await Audit.editou('sites', id, null, { ativo });
-      Toast.show(`Site ${ativo?'ativado':'desativado'}`, 'success');
+      Toast.show(`Site ${ativo ? 'ativado' : 'desativado'}`, 'success');
       await Gerenciar._renderSites();
     } catch (err) {
       Toast.show(err.message, 'error');
