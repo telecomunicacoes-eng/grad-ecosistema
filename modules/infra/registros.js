@@ -354,7 +354,9 @@ const Ocorrencias = {
         </div>
         <div>
           <label class="form-label">Operador</label>
-          <input type="text" class="form-input" id="noc-operador" placeholder="Nome do técnico">
+          <input type="text" class="form-input" id="noc-operador"
+            placeholder="Nome do técnico"
+            value="${Auth.perfil?.nome || Auth.user?.email || ''}">
         </div>
         <div style="grid-column:1/-1">
           <label class="form-label">Observações</label>
@@ -566,7 +568,8 @@ const Ocorrencias = {
         </div>
         <div>
           <label class="form-label">Operador que deu baixa</label>
-          <input type="text" class="form-input" id="bx-op" placeholder="Nome do técnico" value="${o.operador||''}">
+          <input type="text" class="form-input" id="bx-op" placeholder="Nome do técnico"
+            value="${o.operador || Auth.perfil?.nome || Auth.user?.email || ''}">
         </div>
       </div>`,
       [
