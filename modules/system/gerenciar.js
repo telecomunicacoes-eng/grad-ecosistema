@@ -603,6 +603,7 @@ const Gerenciar = {
 
               const payload = {
                 nome, cidade: s.cidade||null, risp_id: rispId,
+                sbs: s.sbs || null,
                 latitude: lat && Math.abs(lat)<=90  ? lat : null,
                 longitude: lon && Math.abs(lon)<=180 ? lon : null,
                 ativo: s.ativo !== false,
