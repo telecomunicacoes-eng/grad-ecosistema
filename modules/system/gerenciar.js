@@ -451,112 +451,282 @@ const Gerenciar = {
     } catch (err) { Toast.show(err.message, 'error'); }
   },
 
+  // ── IMPORTAÇÃO JSON — Modal de progresso ──────────────────────────────────
   async _doImportJSON(input) {
     const file = input.files?.[0];
     if (!file) return;
+    if (input.value !== undefined) input.value = '';
+
     const reader = new FileReader();
     reader.onload = async e => {
+      let raw;
+      try { raw = JSON.parse(e.target.result); }
+      catch { Toast.show('Arquivo JSON inválido', 'error'); return; }
+
+      const isOld = !!(raw.BASE_SITES || raw.REGISTROS);
+      const rispsRaw    = isOld ? (raw.RISPS    || []) : (raw.risps          || []);
+      const motivosRaw  = isOld ? (raw.MOTIVOS  || []) : (raw.motivos        || []);
+      const sitesRaw    = isOld ? (raw.BASE_SITES|| []) : (raw.sites         || []);
+      const registrosRaw= isOld ? (raw.REGISTROS|| []) : (raw.ocorrencias    || []);
+      const exportadoEm = raw.exportedAt ? raw.exportedAt.slice(0,10) : 'data desconhecida';
+      const formato     = isOld ? 'NEBULA (Firebase)' : 'GRAD (Supabase)';
+
+      // ── Abre modal de progresso ────────────────────────────────────────────
+      const steps = [
+        { id:'s-risp',  icon:'🗺️', label:`RISPs (${rispsRaw.length})` },
+        { id:'s-motiv', icon:'⚠️', label:`Motivos (${motivosRaw.length})` },
+        { id:'s-sites', icon:'📡', label:`Sites (${sitesRaw.length})` },
+        { id:'s-regs',  icon:'📋', label:`Registros (${registrosRaw.length})` },
+      ];
+
+      Modal.open('📥 Importando backup', `
+        <div style="margin-bottom:12px;font-size:13px;color:var(--text3)">
+          Formato: <strong style="color:var(--accent2)">${formato}</strong> · Exportado em: <strong>${exportadoEm}</strong>
+        </div>
+        ${steps.map(s => `
+          <div id="${s.id}" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:18px;width:26px;text-align:center" id="${s.id}-ico">⏳</span>
+            <span style="flex:1;font-size:13px">${s.icon} ${s.label}</span>
+            <span style="font-size:12px;font-family:var(--mono);color:var(--text3)" id="${s.id}-st">aguardando</span>
+          </div>`).join('')}
+        <div style="margin-top:16px">
+          <div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">
+            <div id="imp-prog-bar" style="height:100%;background:var(--accent2);border-radius:3px;width:0%;transition:width .4s"></div>
+          </div>
+        </div>
+        <div id="imp-log" style="margin-top:10px;max-height:140px;overflow-y:auto;font-size:11px;font-family:var(--mono);line-height:1.8;color:var(--text3)"></div>
+        <div id="imp-resultado" style="margin-top:10px;display:none"></div>`,
+        [{ label: 'Fechar', class: 'btn-ghost', onclick: 'Modal.close()' }]
+      );
+
+      const setStep = (id, ico, txt, cor) => {
+        const el = document.getElementById(id+'-ico'); if (el) el.textContent = ico;
+        const st = document.getElementById(id+'-st');  if (st) { st.textContent = txt; if (cor) st.style.color = cor; }
+      };
+      const log = (msg, cor='var(--text3)') => {
+        const el = document.getElementById('imp-log');
+        if (!el) return;
+        el.innerHTML += `<div style="color:${cor}">${msg}</div>`;
+        el.scrollTop = el.scrollHeight;
+      };
+      const prog = pct => {
+        const el = document.getElementById('imp-prog-bar');
+        if (el) el.style.width = pct + '%';
+      };
+
+      let totalIn = 0, totalSkip = 0, totalErr = 0;
+
       try {
-        const raw = JSON.parse(e.target.result);
-        const exportedAt = raw.exportedAt || 'data desconhecida';
-        if (!confirm(`Restaurar backup de ${exportedAt}?\nIsso adicionará os dados ao Supabase.`)) return;
-
-        // Detecta formato: antigo NEBULA (BASE_SITES/REGISTROS) ou novo GRAD (sites/ocorrencias)
-        const isOldFormat = !!(raw.BASE_SITES || raw.REGISTROS);
-        Toast.show('Importando dados...', 'info');
-        let ok = 0;
-
-        if (isOldFormat) {
-          // ── FORMATO ANTIGO (NEBULA/Firebase) ──────────────────
-          // 1. RISPs — array de strings
-          const rispsRaw = raw.RISPS || [];
-          if (rispsRaw.length) {
-            const payload = rispsRaw.map(r => ({ nome: typeof r === 'string' ? r : r.nome }));
-            for (const r of payload) {
-              await db.from('risps').upsert(r, { onConflict: 'nome', ignoreDuplicates: true });
-            }
-            ok++;
+        // ══ 1. RISPs ════════════════════════════════════════════════════════
+        setStep('s-risp', '🔄', 'importando…', '#f59e0b');
+        let rispIn = 0, rispSkip = 0;
+        if (rispsRaw.length) {
+          const { data: existentes } = await db.from('risps').select('nome');
+          const jaExistem = new Set((existentes||[]).map(r => r.nome.toLowerCase()));
+          for (const r of rispsRaw) {
+            const nome = typeof r === 'string' ? r : (r.nome || r.RISP || '');
+            if (!nome) continue;
+            if (jaExistem.has(nome.toLowerCase())) { rispSkip++; continue; }
+            const { error } = await db.from('risps').insert({ nome });
+            if (error) { log(`✗ RISP "${nome}": ${error.message}`, '#f87171'); totalErr++; }
+            else { rispIn++; jaExistem.add(nome.toLowerCase()); log(`✓ RISP "${nome}"`, '#34d399'); }
           }
+        }
+        totalIn += rispIn; totalSkip += rispSkip;
+        setStep('s-risp', rispIn > 0 ? '✅' : '⏭️', `${rispIn} inseridos, ${rispSkip} já existiam`, rispIn > 0 ? '#34d399' : 'var(--text3)');
+        prog(25);
 
-          // 2. Motivos — array de strings
-          const motivosRaw = raw.MOTIVOS || [];
-          if (motivosRaw.length) {
-            const payload = motivosRaw.map(m => ({ descricao: typeof m === 'string' ? m : m.descricao || m.nome }));
-            for (const m of payload) {
-              await db.from('motivos_falha').upsert(m, { onConflict: 'descricao', ignoreDuplicates: true });
-            }
-            ok++;
+        // ══ 2. Motivos ══════════════════════════════════════════════════════
+        setStep('s-motiv', '🔄', 'importando…', '#f59e0b');
+        let motivIn = 0, motivSkip = 0;
+        if (motivosRaw.length) {
+          const { data: existentes } = await db.from('motivos_falha').select('descricao');
+          const jaExistem = new Set((existentes||[]).map(m => m.descricao.toLowerCase()));
+          for (const m of motivosRaw) {
+            const desc = typeof m === 'string' ? m : (m.descricao || m.nome || m.MOTIVO || '');
+            if (!desc) continue;
+            if (jaExistem.has(desc.toLowerCase())) { motivSkip++; continue; }
+            const { error } = await db.from('motivos_falha').insert({ descricao: desc });
+            if (error) { log(`✗ Motivo "${desc}": ${error.message}`, '#f87171'); totalErr++; }
+            else { motivIn++; jaExistem.add(desc.toLowerCase()); log(`✓ Motivo "${desc}"`, '#34d399'); }
           }
+        }
+        totalIn += motivIn; totalSkip += motivSkip;
+        setStep('s-motiv', motivIn > 0 ? '✅' : '⏭️', `${motivIn} inseridos, ${motivSkip} já existiam`, motivIn > 0 ? '#34d399' : 'var(--text3)');
+        prog(50);
 
-          // 3. Busca mapa RISP nome→id e motivo descricao→id
-          const { data: rispData  } = await db.from('risps').select('id,nome');
-          const { data: motivData } = await db.from('motivos_falha').select('id,descricao');
-          const rispMapNome  = Object.fromEntries((rispData  ||[]).map(r => [r.nome, r.id]));
-          const motivMapDesc = Object.fromEntries((motivData ||[]).map(m => [m.descricao, m.id]));
+        // ══ Mapa RISP nome→id e motivo desc→id ══════════════════════════════
+        const { data: rispData  } = await db.from('risps').select('id,nome');
+        const { data: motivData } = await db.from('motivos_falha').select('id,descricao');
+        const rispMap  = Object.fromEntries((rispData||[]).map(r => [r.nome.toLowerCase(), r.id]));
+        const motivMap = Object.fromEntries((motivData||[]).map(m => [m.descricao.toLowerCase(), m.id]));
 
-          // 4. BASE_SITES → sites
-          const sitesRaw = raw.BASE_SITES || [];
-          if (sitesRaw.length) {
-            const payload = sitesRaw.map(s => ({
-              nome:       s.nome || `SBS-${s.sbs}`,
-              cidade:     s.cidade || null,
-              risp_id:    rispMapNome[s.risp] || null,
-              latitude:   s.lat  || null,
-              longitude:  s.lon  || null,
-              ativo:      true,
-              observacoes: [s.trafego, s.prop, s.cr].filter(Boolean).join(' · ') || null,
-            }));
-            for (let i = 0; i < payload.length; i += 50) {
-              await db.from('sites').upsert(payload.slice(i, i+50), { ignoreDuplicates: true });
+        // ══ 3. Sites ════════════════════════════════════════════════════════
+        setStep('s-sites', '🔄', 'importando…', '#f59e0b');
+        let siteIn = 0, siteSkip = 0;
+        const siteIdMap = {}; // sbs ou nome → id (para mapear registros)
+
+        if (sitesRaw.length) {
+          const { data: existentes } = await db.from('sites').select('id,nome');
+          const jaExistem = new Set((existentes||[]).map(s => s.nome.toLowerCase()));
+          // Preenche mapa com existentes também
+          (existentes||[]).forEach(s => { siteIdMap[s.nome.toLowerCase()] = s.id; });
+
+          const LOTE = 30;
+          for (let i = 0; i < sitesRaw.length; i += LOTE) {
+            const lote = sitesRaw.slice(i, i + LOTE);
+            for (const s of lote) {
+              const nome = isOld ? (s.nome || `SBS-${s.sbs}`) : (s.nome || '');
+              if (!nome) { siteSkip++; continue; }
+              if (jaExistem.has(nome.toLowerCase())) {
+                siteSkip++;
+                // garante que o map tem o id mesmo pra sites existentes
+                continue;
+              }
+
+              let rispId = null;
+              if (isOld) {
+                rispId = s.risp ? (rispMap[s.risp.toLowerCase()] || null) : null;
+              } else {
+                rispId = s.risp_id || null;
+              }
+
+              const lat = isOld ? (parseFloat(s.lat) || null) : (s.latitude || null);
+              const lon = isOld ? (parseFloat(s.lon) || null) : (s.longitude || null);
+
+              let obs;
+              if (isOld) {
+                obs = Gerenciar._serializeSiteExtras(s.cr||'', s.trafego||'BT', s.prop||'SESP', s.patrimonio||'');
+              } else {
+                obs = s.observacoes || null;
+              }
+
+              const payload = {
+                nome, cidade: s.cidade||null, risp_id: rispId,
+                latitude: lat && Math.abs(lat)<=90  ? lat : null,
+                longitude: lon && Math.abs(lon)<=180 ? lon : null,
+                ativo: s.ativo !== false,
+                observacoes: obs,
+              };
+
+              const { data: inserted, error } = await db.from('sites').insert(payload).select('id').single();
+              if (error) {
+                siteSkip++; totalErr++;
+                log(`✗ Site "${nome}": ${error.message}`, '#f87171');
+              } else {
+                siteIn++;
+                jaExistem.add(nome.toLowerCase());
+                siteIdMap[nome.toLowerCase()] = inserted.id;
+                if (isOld && s.sbs) siteIdMap[String(s.sbs)] = inserted.id;
+              }
             }
-            ok++;
+            // Progresso parcial entre 50-75%
+            prog(50 + Math.round(((i + LOTE) / sitesRaw.length) * 25));
           }
+          log(`📡 ${siteIn} sites inseridos, ${siteSkip} ignorados`, '#3d9bff');
+        }
+        totalIn += siteIn; totalSkip += siteSkip;
+        setStep('s-sites', siteIn > 0 ? '✅' : '⏭️', `${siteIn} inseridos, ${siteSkip} já existiam`, siteIn > 0 ? '#34d399' : 'var(--text3)');
+        prog(75);
 
-          // 5. REGISTROS → ocorrencias (mapeia sbs → site_id pelo nome)
-          const registrosRaw = raw.REGISTROS || [];
-          if (registrosRaw.length) {
-            const { data: siteData } = await db.from('sites').select('id,nome');
-            const siteMapSbs = {};
-            (siteData||[]).forEach(s => {
-              const m = s.nome?.match(/^(\d{4})/);
-              if (m) siteMapSbs[parseInt(m[1])] = s.id;
+        // ══ 4. Registros / Ocorrências ═══════════════════════════════════════
+        setStep('s-regs', '🔄', 'importando…', '#f59e0b');
+        let regIn = 0, regSkip = 0;
+
+        if (registrosRaw.length) {
+          // Busca mapa SBS → site_id pelo nome (prefixo numérico)
+          if (isOld) {
+            const { data: todosSites } = await db.from('sites').select('id,nome');
+            (todosSites||[]).forEach(s => {
+              const m = s.nome?.match(/^(\d{3,5})/);
+              if (m) siteIdMap[m[1]] = s.id;
+              siteIdMap[s.nome.toLowerCase()] = s.id;
             });
-
-            const payload = registrosRaw.map(r => ({
-              site_id:    siteMapSbs[r.sbs] || null,
-              situacao:   r.situacao || 'Inoperante',
-              motivo_id:  motivMapDesc[r.motivo] || null,
-              inicio:     r.inicio || new Date().toISOString().slice(0,10),
-              fim:        r.conclusao && r.situacao === 'Encerrada' ? r.ts : null,
-              prazo:      r.prazo || null,
-              acao:       r.acao  || null,
-              observacoes:r.obs   || null,
-              operador:   r.operador  || null,
-              conclusao:  r.conclusao || null,
-              glpi:       r.glpi || null,
-              criado_em:  r.ts || new Date().toISOString(),
-            })).filter(o => o.site_id);
-
-            for (let i = 0; i < payload.length; i += 50) {
-              await db.from('ocorrencias').upsert(payload.slice(i, i+50), { ignoreDuplicates: true });
-            }
-            if (payload.length) ok++;
           }
 
-          Toast.show(`Backup NEBULA importado! (${ok} coleções · ${sitesRaw.length} sites · ${registrosRaw.length} registros)`, 'success');
+          for (const r of registrosRaw) {
+            let siteId = null;
+            if (isOld) {
+              siteId = siteIdMap[String(r.sbs)] || null;
+            } else {
+              siteId = r.site_id || null;
+            }
+            if (!siteId) { regSkip++; continue; }
 
-        } else {
-          // ── FORMATO NOVO (GRAD/Supabase) ──────────────────────
-          if (raw.risps?.length)       { await db.from('risps').upsert(raw.risps); ok++; }
-          if (raw.motivos?.length)     { await db.from('motivos_falha').upsert(raw.motivos); ok++; }
-          if (raw.sites?.length)       { await db.from('sites').upsert(raw.sites); ok++; }
-          if (raw.ocorrencias?.length) { await db.from('ocorrencias').upsert(raw.ocorrencias); ok++; }
-          Toast.show('Backup restaurado com sucesso!', 'success');
+            const motivoDesc = isOld ? (r.motivo || '') : '';
+            const motivoId   = isOld
+              ? (motivMap[motivoDesc.toLowerCase()] || null)
+              : (r.motivo_id || null);
+
+            const payload = isOld ? {
+              site_id:     siteId,
+              situacao:    r.situacao || 'Inoperante',
+              motivo_id:   motivoId,
+              inicio:      r.inicio   || new Date().toISOString().slice(0,10),
+              fim:         (r.situacao === 'Encerrada' && r.ts) ? r.ts : null,
+              prazo:       r.prazo    || null,
+              acao:        r.acao     || null,
+              observacoes: r.obs      || null,
+              operador:    r.operador || null,
+              conclusao:   r.conclusao|| null,
+              glpi:        r.glpi     || null,
+            } : {
+              site_id:     siteId,
+              situacao:    r.situacao    || 'Inoperante',
+              motivo_id:   motivoId,
+              inicio:      r.inicio      || new Date().toISOString().slice(0,10),
+              fim:         r.fim         || null,
+              prazo:       r.prazo       || null,
+              acao:        r.acao        || null,
+              observacoes: r.observacoes || null,
+              operador:    r.operador    || null,
+              conclusao:   r.conclusao   || null,
+              glpi:        r.glpi        || null,
+            };
+
+            const { error } = await db.from('ocorrencias').insert(payload);
+            if (error) { regSkip++; totalErr++; log(`✗ Registro: ${error.message}`, '#f87171'); }
+            else regIn++;
+          }
+          log(`📋 ${regIn} registros inseridos, ${regSkip} ignorados`, '#3d9bff');
+        }
+        totalIn += regIn; totalSkip += regSkip;
+        setStep('s-regs', regIn > 0 ? '✅' : '⏭️', `${regIn} inseridos, ${regSkip} ignorados`, regIn > 0 ? '#34d399' : 'var(--text3)');
+        prog(100);
+
+        // ══ Resultado final ══════════════════════════════════════════════════
+        const res = document.getElementById('imp-resultado');
+        if (res) {
+          res.style.display = '';
+          res.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
+              <div style="text-align:center;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:10px">
+                <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#34d399">${totalIn}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">INSERIDOS</div>
+              </div>
+              <div style="text-align:center;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px">
+                <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#a5b4fc">${totalSkip}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">JÁ EXISTIAM</div>
+              </div>
+              <div style="text-align:center;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:10px">
+                <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#f87171">${totalErr}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">ERROS</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;font-size:13px;color:${totalIn>0?'#34d399':'#f87171'};text-align:center">
+              ${totalIn > 0 ? '✅ Importação concluída! Os dados já estão no sistema.' : '⚠️ Nenhum dado novo foi inserido.'}
+            </div>`;
         }
 
-        await Gerenciar._renderSites();
-      } catch (err) { Toast.show('Erro ao restaurar: ' + err.message, 'error'); }
-      if (input.value !== undefined) input.value = '';
+        if (totalIn > 0) {
+          Toast.show(`Importação concluída — ${totalIn} registros inseridos`, 'success');
+          await Gerenciar._renderSites();
+        }
+
+      } catch (err) {
+        log(`ERRO CRÍTICO: ${err.message}`, '#f87171');
+        Toast.show('Erro na importação: ' + err.message, 'error');
+      }
     };
     reader.readAsText(file, 'UTF-8');
   },
