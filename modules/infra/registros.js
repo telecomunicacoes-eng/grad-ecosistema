@@ -18,6 +18,17 @@ const Ocorrencias = {
   _pagina: 1,
   _porPagina: 20,
 
+  // Lê proprietário do JSON armazenado em observacoes do site
+  _getSiteProp(o) {
+    try {
+      const obs = o.site?.observacoes;
+      if (obs && obs.trimStart().startsWith('{')) {
+        return JSON.parse(obs).proprietario || null;
+      }
+    } catch {}
+    return null;
+  },
+
   async render(container) {
     container.innerHTML = `
       <div class="page fade-in">
@@ -80,7 +91,7 @@ const Ocorrencias = {
     try {
       const data = await dbQuery(d =>
         d.from('ocorrencias')
-          .select('*, site:sites(id,nome,cidade,proprietario,risp:risps(id,nome)), motivo:motivos_falha(id,descricao)')
+          .select('*, site:sites(id,nome,cidade,observacoes,risp:risps(id,nome)), motivo:motivos_falha(id,descricao)')
           .neq('situacao', 'Operacional')
           .order('inicio', { ascending: false })
       );
@@ -121,10 +132,10 @@ const Ocorrencias = {
       }
     } catch {}
 
-    // Proprietários (dos sites nas ocorrências ativas)
+    // Proprietários (dos sites nas ocorrências ativas — lê do JSON de observacoes)
     try {
       const props = [...new Set(Ocorrencias._data
-        .map(o => o.site?.proprietario)
+        .map(o => Ocorrencias._getSiteProp(o))
         .filter(Boolean)
       )].sort();
       const sel = document.getElementById('oc-prop');
@@ -188,7 +199,7 @@ const Ocorrencias = {
       if (situacao    && o.situacao !== situacao) return false;
       if (risp        && o.site?.risp?.nome !== risp) return false;
       if (motivo      && o.motivo?.descricao !== motivo) return false;
-      if (proprietario && o.site?.proprietario !== proprietario) return false;
+      if (proprietario && Ocorrencias._getSiteProp(o) !== proprietario) return false;
       if (busca       && !o.site?.nome?.toLowerCase().includes(busca) &&
                          !o.site?.cidade?.toLowerCase().includes(busca)) return false;
       return true;
@@ -417,7 +428,7 @@ const Ocorrencias = {
           </div></div>
           <div><label class="form-label">GLPI / Protocolo</label><div style="color:var(--accent2)">${o.glpi||'—'}</div></div>
           <div><label class="form-label">Operador</label><div style="color:var(--text2)">${o.operador||'—'}</div></div>
-          <div><label class="form-label">Proprietário</label><div style="color:var(--text2)">${o.site?.proprietario||'—'}</div></div>
+          <div><label class="form-label">Proprietário</label><div style="color:var(--text2)">${Ocorrencias._getSiteProp(o)||'—'}</div></div>
           <div><label class="form-label">OS</label><div style="color:var(--text2)">${o.os_numero||'—'}</div></div>
         </div>
         ${o.observacoes ? `<div><label class="form-label">Observações</label><div style="color:var(--text2);font-size:13px;white-space:pre-wrap;background:rgba(255,255,255,.03);padding:8px;border-radius:6px">${o.observacoes}</div></div>` : ''}
