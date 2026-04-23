@@ -80,6 +80,12 @@ const App = {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'grid';
     App._setupSearch();
+
+    // Acorda o banco em segundo plano imediatamente após login.
+    // Enquanto o usuário vê o dashboard inicial carregando, o banco já está
+    // sendo "despertado" — reduz o risco de timeout na primeira navegação.
+    dbPing();
+
     App._updateBadges();
     App.navigate('infra', 'dashboard');
   },
@@ -104,19 +110,52 @@ const App = {
     const main = document.getElementById('main-content');
     main.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px"><div class="spinner"></div></div>`;
 
-    setTimeout(() => {
-      const fn = App._modulos[nicho]?.[secao];
-      if (fn) {
-        fn(main);
-      } else {
+    // Guarda qual nicho/secao estamos carregando para o retry funcionar
+    const _nicho = nicho, _secao = secao;
+
+    setTimeout(async () => {
+      const fn = App._modulos[_nicho]?.[_secao];
+
+      if (!fn) {
         main.innerHTML = `
           <div class="page">
             <div class="empty-state">
               <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
               <div class="empty-state-title">Módulo em desenvolvimento</div>
-              <div class="empty-state-sub">${nicho} · ${secao}</div>
+              <div class="empty-state-sub">${_nicho} · ${_secao}</div>
             </div>
           </div>`;
+        return;
+      }
+
+      try {
+        await fn(main);
+      } catch (err) {
+        // Só mostra tela de erro se o módulo não renderizou nada ainda
+        // (spinner ainda visível = módulo não chegou a montar a UI)
+        const aindaSpinner = !!main.querySelector('.spinner');
+        if (aindaSpinner || main.children.length === 0) {
+          const msg = err?.message || 'Erro desconhecido';
+          const isSlow = msg.includes('demorou') || msg.includes('timeout') || msg.includes('Timeout');
+          main.innerHTML = `
+            <div class="page fade-in">
+              <div class="empty-state" style="height:340px">
+                <div style="font-size:48px;margin-bottom:8px">${isSlow ? '⏱' : '⚠️'}</div>
+                <div class="empty-state-title" style="color:#f87171">
+                  ${isSlow ? 'Banco demorou para responder' : 'Erro ao carregar'}
+                </div>
+                <div class="empty-state-sub" style="margin-bottom:20px;max-width:360px">
+                  ${isSlow
+                    ? 'O Supabase estava dormindo e não respondeu a tempo. O banco já foi acordado — tente novamente.'
+                    : msg}
+                </div>
+                <button class="btn btn-primary"
+                  onclick="App.navigate('${_nicho}','${_secao}')">
+                  ↺ Tentar novamente
+                </button>
+              </div>
+            </div>`;
+        }
       }
     }, 80);
   },
