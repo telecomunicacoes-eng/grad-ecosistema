@@ -197,16 +197,30 @@
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Relatório
         </a>
-        <div class="niche-divider"></div>
-        <a class="nav-item nav-sub nav-extra" data-route="infra.mapa" onclick="App.navigate('infra','mapa')">
+      </div>
+    </div>
+
+    <!-- ══ PLANEJAMENTO ══ -->
+    <div class="niche-group" id="niche-planejamento">
+      <div class="niche-header" onclick="App.toggleNiche('planejamento')">
+        <span class="niche-icon">🗺️</span>
+        <span class="niche-label">Planejamento</span>
+        <svg class="niche-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="niche-items">
+        <a class="nav-item nav-sub" data-route="planejamento.dashboard" onclick="App.navigate('planejamento','dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="nav-item nav-sub" data-route="planejamento.mapa" onclick="App.navigate('planejamento','mapa')">
           <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           Mapa de ERBs
         </a>
-        <a class="nav-item nav-sub nav-extra" data-route="infra.base" onclick="App.navigate('infra','base')">
+        <a class="nav-item nav-sub" data-route="planejamento.base" onclick="App.navigate('planejamento','base')">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M12 8v13"/><path d="M5 12H2a10 10 0 0020 0h-3"/></svg>
           Base de Sites
         </a>
-        <a class="nav-item nav-sub nav-extra" data-route="infra.ordens" onclick="App.navigate('infra','ordens')">
+        <a class="nav-item nav-sub" data-route="planejamento.ordens" onclick="App.navigate('planejamento','ordens')">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Ordens de Serviço
         </a>
@@ -412,6 +426,7 @@
 <script src="modules/comunicacoes/issi.js"></script>
 <script src="modules/comunicacoes/comunicacoes.js"></script>
 <!-- 🖥️ Painel -->
+<script src="modules/planejamento/planejamento.js"></script>
 <script src="modules/painel/painel.js"></script>
 <!-- ⚙️ Sistema -->
 <script src="modules/system/gerenciar.js"></script>

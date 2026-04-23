@@ -18,6 +18,9 @@ const App = {
       historico:  el => Historico.render(el),
       alertas:    el => Alertas.render(el),
       relatorio:  el => Relatorio.render(el),
+    },
+    planejamento: {
+      dashboard:  el => Planejamento.render(el),
       mapa:       el => Mapa.render(el),
       base:       el => Base.render(el),
       ordens:     el => Ordens.render(el),

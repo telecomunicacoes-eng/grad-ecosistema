@@ -1,0 +1,433 @@
+
+<h2 class="sr-only">GRAD — Gerência de Radiocomunicação, painel operacional integrado SESP/MT e CIOSP com módulos de infraestrutura TETRA, inteligência, financeiro, equipamentos e comunicações</h2>
+
+<div id="app" style="display:flex;min-height:720px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;font-size:13px;font-family:var(--font-mono);">
+
+  <div id="sidebar" style="width:205px;flex-shrink:0;border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;background:var(--color-background-secondary);">
+    <div style="padding:14px 16px;border-bottom:0.5px solid var(--color-border-tertiary);">
+      <div style="font-size:16px;font-weight:500;color:var(--color-text-primary);letter-spacing:-0.5px;font-family:var(--font-mono);">GRAD</div>
+      <div style="font-size:10px;color:var(--color-text-tertiary);margin-top:3px;">Gerência de Radiocomunicação</div>
+      <div style="font-size:10px;color:var(--color-text-tertiary);">SESP/MT · CIOSP</div>
+    </div>
+    <nav id="module-nav" style="flex:1;padding:6px;overflow-y:auto;"></nav>
+    <div style="padding:10px 12px;border-top:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--color-text-info);flex-shrink:0;">JR</div>
+      <div style="min-width:0;">
+        <div style="font-size:11px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">José Roberto</div>
+        <div style="font-size:10px;color:var(--color-text-tertiary);">GRAD · Admin</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;">
+    <div style="height:46px;flex-shrink:0;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--color-background-primary);">
+      <div id="tb-title" style="font-size:12px;font-weight:500;color:var(--color-text-primary);flex-shrink:0;white-space:nowrap;"></div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--color-text-success);background:var(--color-background-success);padding:3px 9px;border-radius:var(--border-radius-md);flex-shrink:0;">
+        <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span>NMS ao vivo
+      </div>
+      <div id="tb-alert" style="font-size:10px;color:var(--color-text-warning);background:var(--color-background-warning);padding:3px 9px;border-radius:var(--border-radius-md);flex-shrink:0;cursor:pointer;" onclick="setTab('alertas')">▲ <span id="alert-n">7</span> alertas</div>
+      <input type="text" placeholder="Busca global…" style="width:140px;font-size:11px;padding:4px 9px;" />
+    </div>
+    <div id="tab-nav" style="display:flex;border-bottom:0.5px solid var(--color-border-tertiary);padding:0 14px;background:var(--color-background-primary);flex-shrink:0;"></div>
+    <div id="content" style="flex:1;overflow-y:auto;padding:14px;background:var(--color-background-tertiary);"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MODS = [
+  { id:'infra', sym:'◈', label:'Infraestrutura', sub:'Rede TETRA · ERBs · Sites', alerts:3 },
+  { id:'bi',    sym:'◉', label:'Inteligência / BI', sub:'Análise · Cruzamentos', alerts:1 },
+  { id:'fin',   sym:'◇', label:'Financeiro', sub:'Contratos · Faturas', alerts:2 },
+  { id:'equip', sym:'◎', label:'Equipamentos', sub:'Inventário · Patrimônio', alerts:1 },
+  { id:'radio', sym:'◐', label:'Comunicações', sub:'Rádio · GSSI · Frotas', alerts:0 },
+];
+const TABS = ['Dashboard','Registros','Histórico','Alertas','Relatório'];
+let mod = 'infra', tab = 'dashboard';
+const charts = {};
+
+function destroyCharts() { Object.keys(charts).forEach(k=>{ if(charts[k]){charts[k].destroy();delete charts[k];}}); }
+
+function card(val, lbl, col) {
+  return `<div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:11px 13px;">
+    <div style="font-size:10px;color:var(--color-text-secondary);margin-bottom:4px;">${lbl}</div>
+    <div style="font-size:22px;font-weight:500;color:${col};">${val}</div>
+  </div>`;
+}
+
+function badge(txt, type) {
+  const bg={ok:'var(--color-background-success)',warn:'var(--color-background-warning)',err:'var(--color-background-danger)',info:'var(--color-background-info)'};
+  const fg={ok:'var(--color-text-success)',warn:'var(--color-text-warning)',err:'var(--color-text-danger)',info:'var(--color-text-info)'};
+  return `<span style="font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;background:${bg[type]};color:${fg[type]};">${txt}</span>`;
+}
+
+function panel(title, body, extra='') {
+  return `<div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);">
+    <div style="padding:11px 14px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);">${title}</div>${extra}
+    </div>${body}</div>`;
+}
+
+function trow(cells, head=false) {
+  const tag=head?'th':'td';
+  const bg=head?'background:var(--color-background-secondary);':'';
+  return `<tr style="border-top:0.5px solid var(--color-border-tertiary);${bg}">${cells.map(c=>`<${tag} style="padding:7px 11px;text-align:left;font-weight:${head?'500':'400'};color:${head?'var(--color-text-secondary)':'var(--color-text-primary)'};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c}</${tag}>`).join('')}</tr>`;
+}
+
+function infraDashboard() {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin-bottom:12px;">
+      ${card(87,'Total monitorado','var(--color-text-primary)')}
+      ${card(71,'Operando','var(--color-text-success)')}
+      ${card(9,'Parcial','var(--color-text-warning)')}
+      ${card(7,'Inoperante','var(--color-text-danger)')}
+      ${card(4,'Modo Local','var(--color-text-info)')}
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:10px;margin-bottom:12px;">
+      ${panel('Distribuição por status',`
+        <div style="padding:14px;display:flex;align-items:center;gap:14px;">
+          <div style="position:relative;width:110px;height:110px;flex-shrink:0;">
+            <canvas id="cDonut" width="110" height="110" role="img" aria-label="Donut: 71 operando, 9 parcial, 7 inoperante, 4 modo local">71 operando, 9 parcial, 7 inoperante, 4 modo local.</canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;flex:1;">
+            ${[['Operando','#1D9E75','71','81,6%'],['Parcial','#EF9F27','9','10,3%'],['Inoperante','#E24B4A','7','8,0%'],['Modo Local','#378ADD','4','4,6%']].map(([l,c,n,p])=>`
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="width:7px;height:7px;border-radius:2px;background:${c};flex-shrink:0;"></span>
+              <span style="color:var(--color-text-secondary);flex:1;">${l}</span>
+              <span style="font-weight:500;color:var(--color-text-primary);">${n}</span>
+              <span style="color:var(--color-text-tertiary);font-size:10px;">${p}</span>
+            </div>`).join('')}
+            <div style="border-top:0.5px solid var(--color-border-tertiary);padding-top:6px;margin-top:2px;display:flex;gap:6px;">
+              <span style="color:var(--color-text-secondary);">MTTR médio</span>
+              <span style="font-weight:500;color:var(--color-text-primary);margin-left:auto;">18h 24min</span>
+            </div>
+          </div>
+        </div>`)}
+      ${panel('Falhas abertas por RISP',`
+        <div style="padding:14px;position:relative;height:130px;">
+          <canvas id="cBar" role="img" aria-label="Barras de falhas por RISP">Falhas abertas por RISP.</canvas>
+        </div>`)}
+    </div>
+    ${panel('Ocorrências em aberto',`
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        ${trow(['Site / SBS','RISP','Situação','Motivo','Prazo','Operador'],true)}
+        ${[
+          ['SBS-Cáceres','RISP 7','Inoperante','Falha de energia no site','18/04','Souza'],
+          ['SBS-Alta Floresta','RISP 11','Parcial','Link de backbone degradado','20/04','Lima'],
+          ['SBS-Sinop','RISP 10','Inoperante','Transceiver com falha','22/04','Costa'],
+          ['SBS-Rondonópolis','RISP 4','Parcial','Antena desalinhada','19/04','Ferreira'],
+          ['SBS-Tangará','RISP 8','Modo Local','Link IP temporariamente off','17/04','Alves'],
+          ['SBS-Diamantino','RISP 9','Parcial','Bateria de nobreak baixa','21/04','Braga'],
+          ['SBS-São Félix','RISP 14','Inoperante','Vandalismo no site remoto','25/04','—'],
+        ].map((r,i)=>`<tr style="border-top:0.5px solid var(--color-border-tertiary);${i%2?'background:var(--color-background-secondary);':''}">
+          <td style="padding:7px 11px;font-weight:500;color:var(--color-text-primary);font-size:11px;">${r[0]}</td>
+          <td style="padding:7px 11px;color:var(--color-text-secondary);font-size:11px;">${r[1]}</td>
+          <td style="padding:7px 11px;font-size:11px;">${badge(r[2],r[2]==='Inoperante'?'err':r[2]==='Parcial'?'warn':'info')}</td>
+          <td style="padding:7px 11px;color:var(--color-text-secondary);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r[3]}</td>
+          <td style="padding:7px 11px;color:var(--color-text-secondary);font-size:11px;">${r[4]}</td>
+          <td style="padding:7px 11px;color:var(--color-text-secondary);font-size:11px;">${r[5]}</td>
+        </tr>`).join('')}
+      </table></div>`,
+      `<button style="font-size:11px;padding:4px 10px;" onclick="setTab('registros')">Ver todos ↗</button>`
+    )}`;
+}
+
+function initInfraCharts() {
+  const donutEl = document.getElementById('cDonut');
+  if (donutEl) charts.donut = new Chart(donutEl, {
+    type:'doughnut',
+    data:{ labels:['Operando','Parcial','Inoperante','Modo Local'], datasets:[{ data:[71,9,7,4], backgroundColor:['#1D9E75','#EF9F27','#E24B4A','#378ADD'], borderWidth:0, hoverOffset:3 }] },
+    options:{ responsive:false, cutout:'68%', plugins:{ legend:{display:false} } }
+  });
+  const barEl = document.getElementById('cBar');
+  if (barEl) charts.bar = new Chart(barEl, {
+    type:'bar',
+    data:{
+      labels:['R1','R2','R3','R4','R5','R6','R7','R8','R9','R10','R11'],
+      datasets:[{ label:'Falhas', data:[0,1,0,1,0,0,1,1,0,1,1], backgroundColor:'#E24B4A', borderWidth:0, borderRadius:3 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10},color:'#888'}, grid:{display:false} },
+        y:{ ticks:{font:{size:10},color:'#888',stepSize:1}, grid:{color:'rgba(128,128,128,0.1)'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function infraRegistros() {
+  return panel('Registros de ocorrências — todos os sites',`
+    <div style="padding:10px 14px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;gap:8px;">
+      <select style="font-size:11px;"><option>Todos os status</option><option>Inoperante</option><option>Parcial</option><option>Modo Local</option><option>Operando</option></select>
+      <select style="font-size:11px;"><option>Todas as RISPs</option>${Array.from({length:15},(_,i)=>`<option>RISP ${i+1}</option>`).join('')}</select>
+      <input type="text" placeholder="Filtrar por site…" style="flex:1;font-size:11px;" />
+      <button style="font-size:11px;">+ Nova ocorrência</button>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      ${trow(['ID','Site / SBS','RISP / CR','Situação','Causa','Ação tomada','Prazo','Operador'],true)}
+      ${[
+        ['#0142','SBS-Cáceres','RISP 7 / CR3','Inoperante','Falta de energia','Acionado CEMAT + gerador','18/04','Souza'],
+        ['#0141','SBS-Alta Floresta','RISP 11 / CR5','Parcial','Link backbone degradado','Chamado aberto Teltronic','20/04','Lima'],
+        ['#0140','SBS-Sinop','RISP 10 / CR5','Inoperante','Transceiver com falha','Peça solicitada ao almox.','22/04','Costa'],
+        ['#0139','SBS-Rondonópolis','RISP 4 / CR2','Parcial','Antena desalinhada','Visita técnica agendada','19/04','Ferreira'],
+        ['#0138','SBS-Tangará','RISP 8 / CR4','Modo Local','Link IP off','Roteador em análise','17/04','Alves'],
+        ['#0137','SBS-Diamantino','RISP 9 / CR4','Parcial','Nobreak com bateria baixa','Substituição agendada','21/04','Braga'],
+        ['#0136','SBS-São Félix','RISP 14 / CR7','Inoperante','Vandalismo','BO registrado, aguard. reparo','25/04','—'],
+      ].map((r,i)=>`<tr style="border-top:0.5px solid var(--color-border-tertiary);${i%2?'background:var(--color-background-secondary);':''}">
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-tertiary);">${r[0]}</td>
+        <td style="padding:7px 11px;font-size:11px;font-weight:500;color:var(--color-text-primary);">${r[1]}</td>
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[2]}</td>
+        <td style="padding:7px 11px;font-size:11px;">${badge(r[3],r[3]==='Inoperante'?'err':r[3]==='Parcial'?'warn':'info')}</td>
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[4]}</td>
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r[5]}</td>
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[6]}</td>
+        <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[7]}</td>
+      </tr>`).join('')}
+    </table></div>`);
+}
+
+function infraAlertas() {
+  const items=[
+    {lv:'Crítico',ico:'▲',msg:'SBS-São Félix inoperante há 38 dias sem prazo definido',t:'há 38d',c:'err'},
+    {lv:'Crítico',ico:'▲',msg:'SBS-Cáceres inoperante — energia elétrica cortada',t:'há 2d',c:'err'},
+    {lv:'Crítico',ico:'▲',msg:'SBS-Sinop inoperante há mais de 5 dias sem resolução',t:'há 5d',c:'err'},
+    {lv:'Atenção',ico:'◆',msg:'SBS-Rondonópolis — prazo de resolução vence em 2h',t:'há 3h',c:'warn'},
+    {lv:'Atenção',ico:'◆',msg:'SBS-Tangará entrou em Modo Local às 08:14',t:'há 9h',c:'warn'},
+    {lv:'Info',ico:'◈',msg:'SBS-Alta Floresta — nova ocorrência registrada pelo operador Lima',t:'há 1d',c:'info'},
+  ];
+  return `<div style="display:flex;flex-direction:column;gap:8px;">
+    ${items.map(a=>`
+    <div style="display:flex;align-items:flex-start;gap:12px;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-left:3px solid ${a.c==='err'?'#E24B4A':a.c==='warn'?'#EF9F27':'#378ADD'};border-radius:var(--border-radius-md);padding:11px 14px;">
+      <span style="font-size:13px;color:${a.c==='err'?'var(--color-text-danger)':a.c==='warn'?'var(--color-text-warning)':'var(--color-text-info)'};margin-top:1px;">${a.ico}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:10px;font-weight:500;color:${a.c==='err'?'var(--color-text-danger)':a.c==='warn'?'var(--color-text-warning)':'var(--color-text-info)'};margin-bottom:3px;">${a.lv.toUpperCase()}</div>
+        <div style="font-size:12px;color:var(--color-text-primary);">${a.msg}</div>
+      </div>
+      <span style="font-size:10px;color:var(--color-text-tertiary);white-space:nowrap;">${a.t}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function biDashboard() {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px;">
+      ${card(87,'Sites monitorados','var(--color-text-primary)')}
+      ${card('R$ 9,9M','Contrato ativo','var(--color-text-primary)')}
+      ${card(312,'Rádios ativos','var(--color-text-success)')}
+      ${card('94%','Disponibilidade','var(--color-text-success)')}
+    </div>
+    ${panel('Evolução mensal — disponibilidade × falhas',`
+      <div style="padding:14px;position:relative;height:200px;">
+        <canvas id="cBI" role="img" aria-label="Linha de disponibilidade e barras de falhas por mês">Disponibilidade mensal e falhas.</canvas>
+      </div>
+      <div style="display:flex;gap:16px;padding:0 14px 12px;font-size:11px;color:var(--color-text-secondary);">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:2px;background:#1D9E75;display:inline-block;"></span>Disponibilidade (%)</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:#E24B4A;display:inline-block;"></span>Falhas (sites)</span>
+      </div>`)}`;
+}
+
+function initBIChart() {
+  const el=document.getElementById('cBI'); if(!el) return;
+  charts.bi = new Chart(el,{
+    type:'bar',
+    data:{
+      labels:['Out','Nov','Dez','Jan','Fev','Mar','Abr'],
+      datasets:[
+        { type:'line', label:'Disponibilidade (%)', data:[97,95,96,94,93,95,94], borderColor:'#1D9E75', backgroundColor:'transparent', yAxisID:'y1', tension:0.4, pointRadius:3, pointBackgroundColor:'#1D9E75', borderWidth:1.5 },
+        { type:'bar', label:'Falhas', data:[3,5,4,7,9,5,7], backgroundColor:'#E24B4A', yAxisID:'y', borderWidth:0, borderRadius:3 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10},color:'#888'}, grid:{display:false} },
+        y:{ position:'left', ticks:{font:{size:10},color:'#888',stepSize:2}, grid:{color:'rgba(128,128,128,0.1)'}, beginAtZero:true },
+        y1:{ position:'right', min:88, max:100, ticks:{font:{size:10},color:'#888'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function finDashboard() {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px;">
+      ${card('R$ 9,94M','Valor contrato anual','var(--color-text-primary)')}
+      ${card('R$ 2,87M','Gasto acumulado (2025)','var(--color-text-primary)')}
+      ${card('R$ 47.320','Maior fatura (energia)','var(--color-text-warning)')}
+      ${card(3,'Faturas em atraso','var(--color-text-danger)')}
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:12px;">
+      ${panel('Custo mensal de energia — top 5 sites',`
+        <div style="padding:14px;position:relative;height:160px;">
+          <canvas id="cFin" role="img" aria-label="Barras de custo de energia por site">Custo mensal por site.</canvas>
+        </div>`)}
+      ${panel('Contratos vigentes',`
+        <table style="width:100%;border-collapse:collapse;">
+          ${trow(['Contrato','Fornecedor','Vigência','Valor','Status'],true)}
+          ${[
+            ['017/2024','Teltronic S.A.','Abr/24–Abr/26','R$ 9,94M','Ativo'],
+            ['031/2023','ENERGISA','Jan/23–Jan/28','R$ 1,2M/a','Ativo'],
+            ['045/2022','Intelbrás','Mar/22–Mar/25','R$ 380K','Vencendo'],
+          ].map((r,i)=>`<tr style="border-top:0.5px solid var(--color-border-tertiary);${i%2?'background:var(--color-background-secondary);':''}">
+            ${r.map((c,ci)=>`<td style="padding:7px 11px;font-size:11px;color:${ci===4?(c==='Ativo'?'var(--color-text-success)':'var(--color-text-warning)'):'var(--color-text-secondary)'};">${c}</td>`).join('')}
+          </tr>`).join('')}
+        </table>`)}
+    </div>`;
+}
+
+function initFinChart() {
+  const el=document.getElementById('cFin'); if(!el) return;
+  charts.fin = new Chart(el,{
+    type:'bar',
+    data:{
+      labels:['SBS-CPA','SBS-Várzea','SBS-Rondon.','SBS-Sinop','SBS-Alta F.'],
+      datasets:[{ label:'R$ energia', data:[47320,38900,32100,28400,24700], backgroundColor:'#534AB7', borderWidth:0, borderRadius:3 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>`R$ ${ctx.raw.toLocaleString('pt-BR')}` } } },
+      scales:{
+        x:{ ticks:{font:{size:10},color:'#888'}, grid:{display:false} },
+        y:{ ticks:{font:{size:10},color:'#888',callback:v=>`R$ ${(v/1000).toFixed(0)}k`}, grid:{color:'rgba(128,128,128,0.1)'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function equipDashboard() {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px;">
+      ${card(1247,'Total de equipamentos','var(--color-text-primary)')}
+      ${card(1089,'Ativos','var(--color-text-success)')}
+      ${card(94,'Em manutenção','var(--color-text-warning)')}
+      ${card(64,'Baixados','var(--color-text-secondary)')}
+    </div>
+    ${panel('Inventário por tipo e status',`
+      <table style="width:100%;border-collapse:collapse;">
+        ${trow(['Tipo','Modelo','Total','Ativos','Em manutenção','Baixados'],true)}
+        ${[
+          ['Rádio portátil','MTP3250 / MTH800','612','549','42','21'],
+          ['Rádio veicular','MTM5400','298','261','27','10'],
+          ['Rádio fixo / consola','MCC7500','87','81','4','2'],
+          ['Transceiver ERB','RBS3000','142','134','8','0'],
+          ['Gateway / LSC','DIMETRA Express','54','51','3','0'],
+          ['Modem backbone','ETH-Link 600','53','13','10','30'],
+        ].map((r,i)=>`<tr style="border-top:0.5px solid var(--color-border-tertiary);${i%2?'background:var(--color-background-secondary);':''}">
+          <td style="padding:7px 11px;font-size:11px;font-weight:500;color:var(--color-text-primary);">${r[0]}</td>
+          <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[1]}</td>
+          <td style="padding:7px 11px;font-size:11px;color:var(--color-text-primary);">${r[2]}</td>
+          <td style="padding:7px 11px;font-size:11px;color:var(--color-text-success);">${r[3]}</td>
+          <td style="padding:7px 11px;font-size:11px;color:var(--color-text-warning);">${r[4]}</td>
+          <td style="padding:7px 11px;font-size:11px;color:var(--color-text-secondary);">${r[5]}</td>
+        </tr>`).join('')}
+      </table>`)}`;
+}
+
+function radioDashboard() {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px;">
+      ${card(47,'Frotas ativas','var(--color-text-primary)')}
+      ${card('38.241','Chamadas (mês)','var(--color-text-primary)')}
+      ${card('PM-MT','Maior volume','var(--color-text-info)')}
+      ${card(2,'Frotas sem registro','var(--color-text-warning)')}
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;">
+      ${panel('Chamadas por força — abr/2025',`
+        <div style="padding:14px;position:relative;height:170px;">
+          <canvas id="cRadio" role="img" aria-label="Barras de chamadas por força de segurança">Chamadas por força.</canvas>
+        </div>`)}
+      ${panel('Frotas — top 6 por volume',`
+        <table style="width:100%;border-collapse:collapse;">
+          ${trow(['GSSI','Frota','Força','Rádios','Chamadas'],true)}
+          ${[
+            ['1001','Rondas Urbanas MT','PM-MT','42','8.421'],
+            ['1002','Patrulhamento Rodoviário','PRF','18','5.310'],
+            ['2001','GEFRON Sul','GEFRON','24','4.890'],
+            ['1004','ROTAM CPA','PM-MT','36','4.102'],
+            ['3001','PCMT — Central','PC-MT','29','3.780'],
+            ['2003','GEFRON Norte','GEFRON','21','3.210'],
+          ].map((r,i)=>`<tr style="border-top:0.5px solid var(--color-border-tertiary);${i%2?'background:var(--color-background-secondary);':''}">
+            ${r.map((c,ci)=>`<td style="padding:7px 11px;font-size:11px;color:${ci<2?'var(--color-text-primary)':'var(--color-text-secondary)'};">${c}</td>`).join('')}
+          </tr>`).join('')}
+        </table>`)}
+    </div>`;
+}
+
+function initRadioChart() {
+  const el=document.getElementById('cRadio'); if(!el) return;
+  charts.radio = new Chart(el,{
+    type:'bar',
+    data:{
+      labels:['PM-MT','PRF','GEFRON','PC-MT','CBMMT','Outros'],
+      datasets:[{ label:'Chamadas', data:[18421,5310,8100,6280,3980,2150], backgroundColor:['#1D9E75','#378ADD','#EF9F27','#534AB7','#D4537E','#888780'], borderWidth:0, borderRadius:3 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10},color:'#888'}, grid:{display:false} },
+        y:{ ticks:{font:{size:10},color:'#888',callback:v=>`${(v/1000).toFixed(1)}k`}, grid:{color:'rgba(128,128,128,0.1)'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function genericTab() {
+  const msgs={
+    'historico':'Linha do tempo de registros encerrados e resolvidos.',
+    'relatorio':'Exportação de síntese operacional em PDF e Excel.',
+    'registros':'Lançamento e gestão de entradas do módulo.',
+    'alertas':'Destaques críticos e notificações pendentes do módulo.',
+  };
+  const cur=MODS.find(x=>x.id===mod);
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:12px;">
+    <div style="font-size:32px;color:var(--color-text-tertiary);">${cur.sym}</div>
+    <div style="font-size:14px;font-weight:500;color:var(--color-text-primary);">${TABS.find(t=>t.toLowerCase()===tab)}</div>
+    <div style="font-size:12px;color:var(--color-text-secondary);max-width:320px;text-align:center;">${msgs[tab]||''}</div>
+    <button style="font-size:11px;margin-top:4px;" onclick="sendPrompt('Me ajude a construir a tela de ${tab} do módulo ${cur.label} do sistema GRAD — Gerência de Radiocomunicação')">Solicitar implementação desta tela ↗</button>
+  </div>`;
+}
+
+function render() {
+  document.getElementById('module-nav').innerHTML = MODS.map(m=>`
+    <div onclick="setModule('${m.id}')" style="padding:8px 9px;border-radius:var(--border-radius-md);cursor:pointer;margin-bottom:2px;background:${mod===m.id?'var(--color-background-primary)':'transparent'};border:0.5px solid ${mod===m.id?'var(--color-border-secondary)':'transparent'};">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span style="font-size:13px;color:${mod===m.id?'var(--color-text-info)':'var(--color-text-tertiary)'};">${m.sym}</span>
+          <span style="font-size:11px;font-weight:${mod===m.id?'500':'400'};color:${mod===m.id?'var(--color-text-primary)':'var(--color-text-secondary)'};">${m.label}</span>
+        </div>
+        ${m.alerts>0?`<span style="font-size:9px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:1px 5px;border-radius:10px;">${m.alerts}</span>`:''}
+      </div>
+      <div style="font-size:9px;color:var(--color-text-tertiary);margin-top:1px;padding-left:20px;">${m.sub}</div>
+    </div>`).join('');
+
+  const cur=MODS.find(x=>x.id===mod);
+  document.getElementById('tb-title').textContent=`${cur.sym} ${cur.label}`;
+  document.getElementById('alert-n').textContent=MODS.reduce((a,x)=>a+x.alerts,0);
+
+  document.getElementById('tab-nav').innerHTML=TABS.map(t=>`
+    <button onclick="setTab('${t.toLowerCase()}')" style="padding:9px 13px;font-size:11px;font-weight:${tab===t.toLowerCase()?'500':'400'};color:${tab===t.toLowerCase()?'var(--color-text-primary)':'var(--color-text-secondary)'};background:transparent;border:none;border-bottom:2px solid ${tab===t.toLowerCase()?'var(--color-border-primary)':'transparent'};cursor:pointer;margin-bottom:-0.5px;">${t}</button>`).join('');
+
+  destroyCharts();
+  const c=document.getElementById('content');
+  if (mod==='infra'&&tab==='dashboard'){c.innerHTML=infraDashboard();setTimeout(initInfraCharts,50);}
+  else if(mod==='infra'&&tab==='registros'){c.innerHTML=infraRegistros();}
+  else if(mod==='infra'&&tab==='alertas'){c.innerHTML=infraAlertas();}
+  else if(mod==='bi'&&tab==='dashboard'){c.innerHTML=biDashboard();setTimeout(initBIChart,50);}
+  else if(mod==='fin'&&tab==='dashboard'){c.innerHTML=finDashboard();setTimeout(initFinChart,50);}
+  else if(mod==='equip'&&tab==='dashboard'){c.innerHTML=equipDashboard();}
+  else if(mod==='radio'&&tab==='dashboard'){c.innerHTML=radioDashboard();setTimeout(initRadioChart,50);}
+  else{c.innerHTML=genericTab();}
+}
+
+function setModule(id){mod=id;tab='dashboard';render();}
+function setTab(t){tab=t;render();}
+
+render();
+</script>

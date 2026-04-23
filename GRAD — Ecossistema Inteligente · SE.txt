@@ -1,0 +1,92 @@
+GRAD — Ecossistema Inteligente · SESP/MT · CIOSP
+GRAD Monitor
+│
+├── [topbar] Busca global · Toggle tema · Status ao vivo · Perfil / RBAC
+│
+├── padrão de navegação — igual em todos os nichos
+│ ├── Dashboard visão geral do nicho em tempo real
+│ ├── Registros lançamentos · ocorrências · entradas do nicho
+│ ├── Histórico linha do tempo de tudo que foi encerrado/resolvido
+│ ├── Alertas badge contador · destaques críticos do nicho
+│ └── Relatório PDF síntese exportável · Excel · PDF Oficial
+│
+├── 📡 Infraestrutura rede física · sites · ERBs · status operacional da Rede TETRA
+│ │
+│ ├── Dashboard indicadores NMS · gauge · equação de totais · gráficos · tabela de abertos
+│ │ └── Total monitorado · Inoperante · Parcial · Operando · Modo Local · MTTR
+│ │
+│ ├── Registros ocorrências de falha nos sites · em aberto e resolvidas
+│ │ ├── Site/SBS · RISP · Situação · Motivo · Causa · Ação · Prazo · Operador
+│ │ ├── [modal] Nova / Editar ocorrência autocompletar site → RISP · CR · cidade
+│ │ └── [modal] Encerrar ocorrência GLPI · conclusão → move para resolvidos
+│ │
+│ ├── Histórico todas as falhas encerradas · linha do tempo
+│ │
+│ ├── Alertas site inoperante · inop. > 30 dias · sem prazo definido
+│ │
+│ ├── Relatório PDF Geral · Ativos · Resolvidos · Métricas · período · ↓ Excel / PDF
+│ │
+│ └── + telas próprias do nicho
+│ ├── [tela] Mapa de ERBs pins por status · overlay · filtros RISP 1→15
+│ └── [tela] Base de Sites / Gerenciar Dados cadastro · CSV · RISPs · Firestore
+├── 🧠 Inteligência / BI analisa e cruza dados de todos os nichos · visão consolidada do ecossistema
+│ │
+│ ├── Dashboard KPIs consolidados de todos os nichos em um só lugar
+│ │ └── falhas × custos × equipamentos × chamadas · evolução temporal · mapa consolidado por RISP
+│ │
+│ ├── Registros entradas de análise · cruzamentos mapeados · correlações identificadas
+│ │ └── custo energia × sites inop. · chamadas × disponibilidade · equipamentos × falhas
+│ │
+│ ├── Histórico série histórica de todos os indicadores do ecossistema
+│ │
+│ ├── Alertas anomalias detectadas · padrões críticos · indicadores fora da curva
+│ │
+│ └── Relatório PDF relatório analítico cruzado · todos os nichos · ↓ Excel / PDF
+├── 💰 Financeiro / Contratos contratos · finanças · faturas de energia por site · mapeamento de custo mensal
+│ │
+│ ├── Dashboard resumo financeiro · total gasto · média mensal · maior custo por site
+│ │ └── gráfico custo por RISP · evolução mensal · faturas pendentes
+│ │
+│ ├── Registros faturas de energia + contratos
+│ │ ├── Fatura: site · RISP · competência (mês/ano) · valor · status pagamento
+│ │ ├── Contrato: número · objeto · fornecedor · vigência · valor
+│ │ ├── [modal] Lançar / Editar fatura site · mês · valor · comprovante
+│ │ └── [modal] Cadastrar / Editar contrato
+│ │
+│ ├── Histórico pagamentos realizados · contratos encerrados · série histórica de consumo
+│ │
+│ ├── Alertas fatura em atraso · fatura ausente no mês · contrato próximo do vencimento
+│ │
+│ └── Relatório PDF custo por site · por RISP · por período · ↓ Excel / PDF
+├── 🔧 Equipamentos / Patrimônio cada rádio individualmente mapeado · ID único por equipamento
+│ │
+│ ├── Dashboard visão geral do inventário · totais por tipo · status · localização
+│ │ └── total de equipamentos · ativos · em manutenção · baixados · mapa de distribuição
+│ │
+│ ├── Registros ficha individual de cada equipamento
+│ │ ├── Tipo · Modelo · Fabricante · Nº Série · TEI · Nº Patrimônio
+│ │ ├── Local / Site onde está · Status (ativo · manutenção · baixado)
+│ │ ├── [modal] Cadastrar / Editar equipamento
+│ │ └── [modal] Ficha completa histórico de movimentações e manutenções
+│ │
+│ ├── Histórico movimentações · manutenções · baixas · transferências por equipamento
+│ │
+│ ├── Alertas equipamento sem localização · em manutenção há muito tempo · TEI duplicado
+│ │
+│ └── Relatório PDF inventário completo · por tipo · por local · por status · ↓ Excel / PDF
+└── 📻 Comunicações / Rádio GSSI · frotas de segurança pública · chamadas por frota e por força
+│
+├── Dashboard visão geral das comunicações · frotas ativas · volume de chamadas
+│ └── total chamadas · por força (PM · PRF · GEFRON…) · por frota · mapa por RISP
+│
+├── Registros frotas + lançamento de chamadas
+│ ├── Frota: GSSI · nome · força · total de rádios vinculados
+│ ├── Chamadas: frota · força · período · total de chamadas
+│ ├── [modal] Cadastrar / Editar frota GSSI · força · rádios vinculados
+│ └── [modal] Lançar chamadas frota · período · quantidade
+│
+├── Histórico série histórica de chamadas por frota · por força · por período
+│
+├── Alertas frota sem comunicação registrada · GSSI sem rádio vinculado
+│
+└── Relatório PDF chamadas por frota · por força · por período · ↓ Excel / PDF
