@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>GRAD — Importar Backup NEBULA</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/supabase.js"></script>
+<style>
+  body { font-family: 'IBM Plex Sans', sans-serif; background: #0a1628; color: #daeaff; margin: 0; padding: 32px; }
+  h1   { color: #3d9bff; margin-bottom: 4px; }
+  .sub { color: #9ab8d8; margin-bottom: 28px; font-size: 14px; }
+  .card { background: #111c30; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; color: #3d9bff; margin-bottom: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  .btn { background: #1a6fd4; border: none; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: #2280e8; }
+  .btn:disabled { background: #2a3d5a; color: #6a8aaa; cursor: default; }
+  .btn-danger { background: #c0392b; }
+  .btn-danger:hover { background: #e74c3c; }
+  .btn-ghost { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15); }
+  .btn-ghost:hover { background: rgba(255,255,255,.13); }
+  .drop-zone { border: 2px dashed rgba(61,155,255,.4); border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s; margin-bottom: 12px; }
+  .drop-zone:hover, .drop-zone.over { border-color: #3d9bff; background: rgba(61,155,255,.05); }
+  .drop-icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-title { font-size: 16px; font-weight: 600; color: #daeaff; }
+  .drop-sub { font-size: 12px; color: #9ab8d8; margin-top: 4px; }
+  .step { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .step:last-child { border-bottom: none; }
+  .step-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+  .step-label { flex: 1; font-size: 14px; }
+  .step-status { font-size: 12px; font-family: monospace; min-width: 120px; text-align: right; }
+  .status-wait  { color: #9ab8d8; }
+  .status-run   { color: #f59e0b; }
+  .status-ok    { color: #22c55e; }
+  .status-skip  { color: #9ab8d8; }
+  .status-err   { color: #f87171; }
+  .progress-bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #3d9bff; border-radius: 3px; transition: width .3s; }
+  .log { background: #080f1e; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 14px; font-size: 12px; font-family: monospace; max-height: 320px; overflow-y: auto; line-height: 1.7; }
+  .log-ok   { color: #22c55e; }
+  .log-warn { color: #f59e0b; }
+  .log-err  { color: #f87171; }
+  .log-info { color: #9ab8d8; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+  .summary-card { background: #0f2044; border: 1px solid rgba(61,155,255,.2); border-radius: 8px; padding: 14px; text-align: center; }
+  .summary-num { font-size: 32px; font-weight: 700; font-family: monospace; color: #3d9bff; }
+  .summary-lbl { font-size: 11px; color: #9ab8d8; text-transform: uppercase; letter-spacing: .07em; margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: monospace; }
+  .badge-blue { background: rgba(61,155,255,.15); color: #3d9bff; }
+  .badge-green { background: rgba(34,197,94,.12); color: #22c55e; }
+  .badge-amber { background: rgba(245,158,11,.12); color: #f59e0b; }
+  input[type=file] { display: none; }
+  #section-result { display: none; }
+  #section-running { display: none; }
+</style>
+</head>
+<body>
+
+<h1>📥 Importar Backup NEBULA → GRAD</h1>
+<p class="sub">Importa dados do sistema antigo (Firebase/NEBULA) para o novo banco Supabase · GRAD Ecossistema</p>
+
+<!-- SEÇÃO 1: Upload -->
+<div class="card" id="section-upload">
+  <div class="card-title">1. Selecione o arquivo de backup</div>
+  <div class="drop-zone" id="drop-zone"
+    ondragover="event.preventDefault();this.classList.add('over')"
+    ondragleave="this.classList.remove('over')"
+    ondrop="handleDrop(event)"
+    onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">📂</div>
+    <div class="drop-title">Clique ou arraste o arquivo JSON aqui</div>
+    <div class="drop-sub">Aceita: NEBULA_BACKUP_*.json · GRAD_BACKUP_*.json</div>
+  </div>
+  <input type="file" id="file-input" accept=".json" onchange="handleFile(this.files[0])">
+  <div id="file-info" style="font-size:13px;color:#9ab8d8;min-height:18px"></div>
+</div>
+
+<!-- SEÇÃO 2: Preview -->
+<div class="card" id="section-preview" style="display:none">
+  <div class="card-title">2. Preview dos dados</div>
+  <div class="summary-grid" id="preview-grid"></div>
+  <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+    <button class="btn" id="btn-importar" onclick="iniciarImport()">▶ Iniciar importação</button>
+    <button class="btn btn-ghost" onclick="resetar()">✕ Cancelar</button>
+    <div id="preview-aviso" style="font-size:12px;color:#f59e0b"></div>
+  </div>
+</div>
+
+<!-- SEÇÃO 3: Progresso -->
+<div class="card" id="section-running">
+  <div class="card-title">3. Progresso da importação</div>
+  <div id="steps-list"></div>
+  <div class="progress-bar" style="margin-top:16px">
+    <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+  <div id="progress-label" style="font-size:12px;color:#9ab8d8;margin-top:6px;text-align:right"></div>
+  <div class="log" id="log" style="margin-top:14px"></div>
+</div>
+
+<!-- SEÇÃO 4: Resultado -->
+<div class="card" id="section-result">
+  <div class="card-title">4. Resultado</div>
+  <div class="summary-grid" id="result-grid"></div>
+  <div id="result-msg" style="margin-top:16px;font-size:14px"></div>
+  <div style="margin-top:16px;display:flex;gap:10px">
+    <button class="btn" onclick="window.location.href='index.html'">🏠 Ir para o GRAD</button>
+    <button class="btn btn-ghost" onclick="resetar()">↺ Importar outro arquivo</button>
+  </div>
+</div>
+
+<script>
+// ── Supabase (usa as mesmas credenciais do sistema) ──
+let db;
+document.addEventListener('DOMContentLoaded', () => {
+  // Aguarda supabase.js carregar o cliente
+  setTimeout(() => {
+    if (typeof window._supabase !== 'undefined') {
+      db = window._supabase;
+    } else if (typeof supabase !== 'undefined') {
+      db = supabase;
+    }
+    if (!db) {
+      logMsg('⚠ Cliente Supabase não carregado. Verifique lib/supabase.js', 'err');
+    }
+  }, 500);
+});
+
+let _rawData = null;
+
+// ── Helpers de log ──────────────────────────────────
+function logMsg(msg, tipo = 'info') {
+  const el = document.getElementById('log');
+  const cls = { ok:'log-ok', warn:'log-warn', err:'log-err', info:'log-info' }[tipo] || 'log-info';
+  const ts = new Date().toLocaleTimeString('pt-BR');
+  el.innerHTML += `<div class="${cls}">[${ts}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStep(id, status, detail = '') {
+  const el = document.getElementById(`step-status-${id}`);
+  if (!el) return;
+  const map = {
+    wait:  { cls:'status-wait',  txt:'Aguardando...' },
+    run:   { cls:'status-run',   txt:'Processando...' },
+    ok:    { cls:'status-ok',    txt: detail || 'Concluído ✓' },
+    skip:  { cls:'status-skip',  txt: detail || 'Ignorado' },
+    err:   { cls:'status-err',   txt: detail || 'Erro ✕' },
+  };
+  const s = map[status] || map.wait;
+  el.className = `step-status ${s.cls}`;
+  el.textContent = s.txt;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label || '';
+}
+
+// ── Drag & drop / file ─────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      _rawData = raw;
+      showPreview(raw, file.name);
+    } catch (err) {
+      document.getElementById('file-info').textContent = '⚠ Erro ao ler JSON: ' + err.message;
+      document.getElementById('file-info').style.color = '#f87171';
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function showPreview(raw, filename) {
+  // Detecta formato
+  const isOld = !!(raw.BASE_SITES || raw.REGISTROS);
+  const sites    = isOld ? (raw.BASE_SITES   || []) : (raw.sites      || []);
+  const ocorrs   = isOld ? (raw.REGISTROS    || []) : (raw.ocorrencias|| []);
+  const risps    = isOld ? (raw.RISPS        || []) : (raw.risps       || []);
+  const motivos  = isOld ? (raw.MOTIVOS      || []) : (raw.motivos     || []);
+
+  document.getElementById('file-info').textContent = `✓ ${filename} carregado com sucesso`;
+  document.getElementById('file-info').style.color = '#22c55e';
+
+  document.getElementById('preview-grid').innerHTML = `
+    <div class="summary-card"><div class="summary-num">${risps.length}</div><div class="summary-lbl">RISPs</div></div>
+    <div class="summary-card"><div class="summary-num">${motivos.length}</div><div class="summary-lbl">Motivos</div></div>
+    <div class="summary-card"><div class="summary-num">${sites.length}</div><div class="summary-lbl">Sites / ERBs</div></div>
+    <div class="summary-card"><div class="summary-num">${ocorrs.length}</div><div class="summary-lbl">Ocorrências</div></div>
+  `;
+
+  const formato = isOld ? '🔄 Formato NEBULA (antigo)' : '✅ Formato GRAD (novo)';
+  const data    = raw.exportedAt ? new Date(raw.exportedAt).toLocaleString('pt-BR') : 'desconhecida';
+  document.getElementById('preview-aviso').innerHTML = `${formato} &nbsp;·&nbsp; Exportado em: ${data}`;
+
+  document.getElementById('section-preview').style.display = '';
+}
+
+// ── IMPORTAÇÃO ─────────────────────────────────────
+async function iniciarImport() {
+  if (!_rawData) return;
+  if (!db) { alert('Erro: cliente Supabase não inicializado. Verifique lib/supabase.js'); return; }
+
+  document.getElementById('btn-importar').disabled = true;
+  document.getElementById('section-running').style.display = '';
+  document.getElementById('section-running').scrollIntoView({ behavior: 'smooth' });
+
+  const raw   = _rawData;
+  const isOld = !!(raw.BASE_SITES || raw.REGISTROS);
+
+  const sites   = isOld ? (raw.BASE_SITES   || []) : (raw.sites       || []);
+  const ocorrs  = isOld ? (raw.REGISTROS    || []) : (raw.ocorrencias  || []);
+  const rispsRaw = isOld ? (raw.RISPS       || []) : (raw.risps        || []);
+  const motivosRaw = isOld ? (raw.MOTIVOS   || []) : (raw.motivos      || []);
+
+  const STEPS = [
+    { id:'risps',   icon:'🗺️', label:`RISPs (${rispsRaw.length})` },
+    { id:'motivos', icon:'⚠️', label:`Motivos de falha (${motivosRaw.length})` },
+    { id:'sites',   icon:'📡', label:`Sites / ERBs (${sites.length})` },
+    { id:'ocorrs',  icon:'📋', label:`Ocorrências (${ocorrs.length})` },
+  ];
+
+  document.getElementById('steps-list').innerHTML = STEPS.map(s => `
+    <div class="step">
+      <div class="step-icon">${s.icon}</div>
+      <div class="step-label">${s.label}</div>
+      <div class="step-status status-wait" id="step-status-${s.id}">Aguardando...</div>
+    </div>`).join('');
+
+  const result = { risps:0, motivos:0, sites:0, ocorrs:0, erros:[] };
+
+  // ── 1. RISPs ──────────────────────────────────────
+  setStep('risps', 'run');
+  setProgress(5, 'Importando RISPs...');
+  logMsg(`Iniciando importação de ${rispsRaw.length} RISPs...`);
+  const rispIdMap = {}; // nome → id
+
+  for (const r of rispsRaw) {
+    const nome = typeof r === 'string' ? r : (r.nome || '');
+    if (!nome) continue;
+    try {
+      // Tenta inserir, ignora se já existe
+      const { data: existing } = await db.from('risps').select('id').eq('nome', nome).maybeSingle();
+      if (existing) {
+        rispIdMap[nome] = existing.id;
+        logMsg(`  RISP "${nome}" já existe (id: ${existing.id.slice(0,8)})`, 'info');
+      } else {
+        const { data: inserted, error } = await db.from('risps').insert({ nome }).select().single();
+        if (error) {
+          // Pode ter sido inserido em paralelo (race), tenta buscar novamente
+          const { data: retry } = await db.from('risps').select('id').eq('nome', nome).maybeSingle();
+          if (retry) { rispIdMap[nome] = retry.id; logMsg(`  RISP "${nome}" criada`, 'ok'); result.risps++; }
+          else { logMsg(`  RISP "${nome}" erro: ${error.message}`, 'err'); result.erros.push(`RISP ${nome}: ${error.message}`); }
+        } else {
+          rispIdMap[nome] = inserted.id;
+          logMsg(`  RISP "${nome}" criada ✓`, 'ok');
+          result.risps++;
+        }
+      }
+    } catch (err) { logMsg(`  RISP "${nome}" exceção: ${err.message}`, 'err'); }
+  }
+  setStep('risps', 'ok', `${result.risps} criadas`);
+  setProgress(20, 'RISPs concluídas');
+
+  // ── 2. Motivos ────────────────────────────────────
+  setStep('motivos', 'run');
+  setProgress(22, 'Importando motivos...');
+  logMsg(`\nImportando ${motivosRaw.length} motivos de falha...`);
+  const motivoIdMap = {}; // descricao → id
+
+  for (const m of motivosRaw) {
+    const desc = typeof m === 'string' ? m : (m.descricao || m.nome || '');
+    if (!desc) continue;
+    try {
+      const { data: existing } = await db.from('motivos_falha').select('id').eq('descricao', desc).maybeSingle();
+      if (existing) {
+        motivoIdMap[desc] = existing.id;
+        logMsg(`  Motivo "${desc}" já existe`, 'info');
+      } else {
+        const { data: inserted, error } = await db.from('motivos_falha').insert({ descricao: desc }).select().single();
+        if (error) {
+          const { data: retry } = await db.from('motivos_falha').select('id').eq('descricao', desc).maybeSingle();
+          if (retry) { motivoIdMap[desc] = retry.id; }
+          else { logMsg(`  Motivo "${desc}" erro: ${error.message}`, 'err'); result.erros.push(error.message); }
+        } else {
+          motivoIdMap[desc] = inserted.id;
+          logMsg(`  Motivo "${desc}" criado ✓`, 'ok');
+          result.motivos++;
+        }
+      }
+    } catch (err) { logMsg(`  Motivo "${desc}" exceção: ${err.message}`, 'err'); }
+  }
+  setStep('motivos', 'ok', `${result.motivos} criados`);
+  setProgress(35, 'Motivos concluídos');
+
+  // ── 3. Sites ──────────────────────────────────────
+  setStep('sites', 'run');
+  logMsg(`\nImportando ${sites.length} sites...`);
+  let siteAdded = 0, siteSkip = 0;
+  const siteIdMap = {}; // sbs → id (para mapear ocorrências)
+
+  // Busca sites já existentes para evitar duplicatas por nome
+  const { data: sitesExistentes } = await db.from('sites').select('id, nome');
+  const nomesExistentes = new Set((sitesExistentes || []).map(s => s.nome));
+  // Monta mapa sbs→id para sites já existentes (extrai número do nome)
+  (sitesExistentes || []).forEach(s => {
+    const m = s.nome?.match(/^(\d{4})/);
+    if (m) siteIdMap[parseInt(m[1])] = s.id;
+  });
+
+  for (let i = 0; i < sites.length; i++) {
+    const s = sites[i];
+    const nome = s.nome || `SBS-${s.sbs}`;
+
+    if (nomesExistentes.has(nome)) {
+      siteSkip++;
+      if (siteIdMap[s.sbs] === undefined && s.sbs) {
+        // Mesmo que já exista, garante que o mapa tenha o id
+        const found = (sitesExistentes || []).find(x => x.nome === nome);
+        if (found) siteIdMap[s.sbs] = found.id;
+      }
+      continue;
+    }
+
+    const rispId = rispIdMap[s.risp] || null;
+    const lat = (s.lat && Math.abs(s.lat) <= 90)  ? s.lat : null;
+    const lon = (s.lon && Math.abs(s.lon) <= 180) ? s.lon : null;
+
+    const extras = {};
+    if (s.cr)     extras.cr           = s.cr;
+    if (s.trafego) extras.trafego     = s.trafego;
+    if (s.prop)   extras.proprietario = s.prop;
+    if (s.patrimonio) extras.patrimonio = s.patrimonio;
+
+    const payload = {
+      nome,
+      cidade:      s.cidade || null,
+      risp_id:     rispId,
+      latitude:    lat,
+      longitude:   lon,
+      ativo:       true,
+      observacoes: Object.keys(extras).length ? JSON.stringify(extras) : null,
+    };
+
+    try {
+      const { data: inserted, error } = await db.from('sites').insert(payload).select('id').single();
+      if (error) {
+        logMsg(`  Site "${nome}" erro: ${error.message}`, 'err');
+        result.erros.push(`Site ${nome}: ${error.message}`);
+        siteSkip++;
+      } else {
+        if (s.sbs) siteIdMap[s.sbs] = inserted.id;
+        siteAdded++;
+        result.sites++;
+        if (siteAdded % 20 === 0) logMsg(`  ... ${siteAdded} sites inseridos até agora`, 'info');
+      }
+    } catch (err) { logMsg(`  Site "${nome}" exceção: ${err.message}`, 'err'); siteSkip++; }
+
+    // Atualiza progresso
+    const pct = 35 + Math.round((i / sites.length) * 45);
+    setProgress(pct, `Sites: ${siteAdded} inseridos, ${siteSkip} ignorados...`);
+  }
+
+  logMsg(`  Sites: ${siteAdded} inseridos, ${siteSkip} já existiam`, siteAdded > 0 ? 'ok' : 'warn');
+  setStep('sites', siteAdded > 0 ? 'ok' : 'skip', `${siteAdded} criados / ${siteSkip} ignorados`);
+  setProgress(80, 'Sites concluídos');
+
+  // ── 4. Ocorrências ────────────────────────────────
+  setStep('ocorrs', 'run');
+  logMsg(`\nImportando ${ocorrs.length} ocorrências...`);
+  let ocAdded = 0, ocSkip = 0;
+
+  for (let i = 0; i < ocorrs.length; i++) {
+    const o = isOld ? ocorrs[i] : ocorrs[i];
+
+    let siteId = null;
+    if (isOld) {
+      siteId = siteIdMap[o.sbs] || null;
+    } else {
+      siteId = o.site_id || null;
+    }
+
+    if (!siteId) { ocSkip++; continue; }
+
+    const motivoId = isOld
+      ? (motivoIdMap[o.motivo] || null)
+      : (o.motivo_id || null);
+
+    const payload = isOld ? {
+      site_id:     siteId,
+      situacao:    o.situacao || 'Inoperante',
+      motivo_id:   motivoId,
+      inicio:      o.inicio || new Date().toISOString().slice(0,10),
+      prazo:       o.prazo  || null,
+      acao:        o.acao   || null,
+      observacoes: o.obs    || null,
+      operador:    o.operador || null,
+      conclusao:   o.conclusao || null,
+      glpi:        o.glpi   || null,
+      criado_em:   o.ts     || new Date().toISOString(),
+    } : o;
+
+    try {
+      const { error } = await db.from('ocorrencias').insert(payload);
+      if (error) { ocSkip++; }
+      else { ocAdded++; result.ocorrs++; }
+    } catch { ocSkip++; }
+
+    const pct = 80 + Math.round((i / ocorrs.length) * 18);
+    setProgress(pct, `Ocorrências: ${ocAdded} inseridas...`);
+  }
+
+  logMsg(`  Ocorrências: ${ocAdded} inseridas, ${ocSkip} ignoradas`, ocAdded > 0 ? 'ok' : 'warn');
+  setStep('ocorrs', ocAdded > 0 ? 'ok' : 'skip', `${ocAdded} criadas / ${ocSkip} ignoradas`);
+  setProgress(100, 'Importação concluída!');
+
+  // ── Resultado final ───────────────────────────────
+  logMsg(`\n============================`, 'ok');
+  logMsg(`IMPORTAÇÃO CONCLUÍDA`, 'ok');
+  logMsg(`RISPs:       ${result.risps} criadas`, 'ok');
+  logMsg(`Motivos:     ${result.motivos} criados`, 'ok');
+  logMsg(`Sites:       ${result.sites} criados (${siteSkip} já existiam)`, 'ok');
+  logMsg(`Ocorrências: ${result.ocorrs} criadas`, 'ok');
+  if (result.erros.length) logMsg(`Erros: ${result.erros.length} — veja acima`, 'warn');
+
+  document.getElementById('section-result').style.display = '';
+  document.getElementById('result-grid').innerHTML = `
+    <div class="summary-card"><div class="summary-num" style="color:#22c55e">${result.risps}</div><div class="summary-lbl">RISPs criadas</div></div>
+    <div class="summary-card"><div class="summary-num" style="color:#22c55e">${result.motivos}</div><div class="summary-lbl">Motivos criados</div></div>
+    <div class="summary-card"><div class="summary-num" style="color:#22c55e">${result.sites}</div><div class="summary-lbl">Sites criados</div></div>
+    <div class="summary-card"><div class="summary-num" style="color:#22c55e">${result.ocorrs}</div><div class="summary-lbl">Ocorrências</div></div>
+  `;
+  const temErros = result.erros.length > 0;
+  document.getElementById('result-msg').innerHTML = temErros
+    ? `<span style="color:#f59e0b">⚠ Importação concluída com ${result.erros.length} aviso(s). Veja o log acima.</span>`
+    : `<span style="color:#22c55e">✅ Importação concluída com sucesso! Acesse o GRAD para ver os dados.</span>`;
+
+  document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetar() {
+  _rawData = null;
+  document.getElementById('file-info').textContent = '';
+  document.getElementById('section-preview').style.display = 'none';
+  document.getElementById('section-running').style.display = 'none';
+  document.getElementById('section-result').style.display = 'none';
+  document.getElementById('btn-importar').disabled = false;
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('progress-fill').style.width = '0%';
+}
+</script>
+</body>
+</html>
