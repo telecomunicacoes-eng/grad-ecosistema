@@ -392,8 +392,7 @@ const Ocorrencias = {
     try {
       const { data, error } = await db.from('ocorrencias').insert({
         site_id, situacao, motivo_id, inicio, prazo, glpi, operador,
-        observacoes: obs, acao,
-        criado_por: Auth.user?.id
+        observacoes: obs, acao
       }).select().single();
       if (error) throw error;
       await Audit.criou('ocorrencias', data.id, data);
