@@ -121,7 +121,7 @@ const Ocorrencias = {
 
     // Motivos
     try {
-      const mots = await dbQuery(d => d.from('motivos_falha').select('id,descricao').order('descricao'));
+      const mots = await dbQuery(d => d.from('motivos_falha').select('id,descricao').eq('nicho','infra').order('descricao'));
       const sel = document.getElementById('oc-mot');
       if (sel && mots) {
         mots.forEach(m => {
@@ -316,7 +316,7 @@ const Ocorrencias = {
     let motivoOpts = '<option value="">Selecione o motivo...</option>';
     try {
       const sites  = await dbQuery(d => d.from('sites').select('id,nome').eq('ativo',true).order('nome'));
-      const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').order('descricao'));
+      const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').eq('nicho','infra').order('descricao'));
       sitesOpts  = '<option value="">Selecione um site...</option>' + (sites||[]).map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
       motivoOpts = '<option value="">Selecione o motivo...</option>' + (motivos||[]).map(m=>`<option value="${m.id}">${m.descricao}</option>`).join('');
     } catch {}
@@ -453,7 +453,7 @@ const Ocorrencias = {
     let motivoOpts = '';
     try {
       const sites  = await dbQuery(d => d.from('sites').select('id,nome').eq('ativo',true).order('nome'));
-      const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').order('descricao'));
+      const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').eq('nicho','infra').order('descricao'));
       sitesOpts  = (sites||[]).map(s=>`<option value="${s.id}" ${s.id===o.site_id?'selected':''}>${s.nome}</option>`).join('');
       motivoOpts = '<option value="">—</option>' + (motivos||[]).map(m=>`<option value="${m.id}" ${m.id===o.motivo_id?'selected':''}>${m.descricao}</option>`).join('');
     } catch {}

@@ -1155,23 +1155,38 @@ const Gerenciar = {
     const el = document.getElementById('gerenciar-conteudo');
     try {
       const motivos = await dbQuery(d => d.from('motivos_falha').select('*').order('descricao'));
+      const nichoLabel = n => n === 'infra' ? '📡 Infraestrutura' : n === 'missoes' ? '🎯 Missões' : '—';
+      const nichoCor   = n => n === 'infra' ? '#3d9bff' : n === 'missoes' ? '#22c55e' : '#6b7280';
+      const infra   = (motivos||[]).filter(m => m.nicho === 'infra');
+      const missoes = (motivos||[]).filter(m => m.nicho === 'missoes');
+      const renderLinha = m => `
+        <tr>
+          <td>${m.descricao}</td>
+          <td><span style="font-size:11px;font-weight:600;color:${nichoCor(m.nicho)}">${nichoLabel(m.nicho)}</span></td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="Gerenciar.editarMotivo('${m.id}','${m.descricao.replace(/'/g,"\\'")}','${m.nicho||'infra'}')">✎</button>
+          </td>
+        </tr>`;
+
       el.innerHTML = `
         <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
           <button class="btn btn-primary btn-sm" onclick="Gerenciar.novoMotivo()">+ Novo Motivo</button>
         </div>
-        <div class="card" style="padding:0">
+        <div class="card" style="padding:0;margin-bottom:12px">
+          <div style="padding:10px 14px;font-size:12px;font-weight:700;color:#3d9bff;border-bottom:1px solid var(--border)">📡 Infraestrutura</div>
           <div class="table-wrap" style="border:none">
             <table>
-              <thead><tr><th>Descrição</th><th>Categoria</th><th>Ações</th></tr></thead>
-              <tbody>${(motivos||[]).map(m => `
-                <tr>
-                  <td>${m.descricao}</td>
-                  <td><span class="badge badge-gray">${m.categoria||'—'}</span></td>
-                  <td>
-                    <button class="btn btn-ghost btn-sm" onclick="Gerenciar.editarMotivo('${m.id}','${m.descricao.replace(/'/g,"\\'")}','${m.categoria||''}')">✎</button>
-                  </td>
-                </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text3)">Nenhum motivo</td></tr>'}
-              </tbody>
+              <thead><tr><th>Descrição</th><th>Nicho</th><th>Ações</th></tr></thead>
+              <tbody>${infra.map(renderLinha).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--text3)">Nenhum motivo</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;border-bottom:1px solid var(--border)">🎯 Missões</div>
+          <div class="table-wrap" style="border:none">
+            <table>
+              <thead><tr><th>Descrição</th><th>Nicho</th><th>Ações</th></tr></thead>
+              <tbody>${missoes.map(renderLinha).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--text3)">Nenhum motivo</td></tr>'}</tbody>
             </table>
           </div>
         </div>`;
@@ -1179,23 +1194,17 @@ const Gerenciar = {
   },
 
   novoMotivo() {
-    Modal.open('Novo Motivo de Falha', `
+    Modal.open('Novo Motivo', `
       <div class="form-grid-2">
         <div style="grid-column:1/-1">
           <label class="form-label">Descrição *</label>
           <input class="form-input" id="mof-desc" placeholder="Ex: Queda de energia">
         </div>
         <div>
-          <label class="form-label">Categoria</label>
-          <select class="form-select" id="mof-cat">
-            <option value="">—</option>
-            <option>Energia</option>
-            <option>Transmissão</option>
-            <option>Equipamento</option>
-            <option>Infraestrutura</option>
-            <option>Clima</option>
-            <option>Vandalismo</option>
-            <option>Outros</option>
+          <label class="form-label">Nicho *</label>
+          <select class="form-select" id="mof-nicho">
+            <option value="infra">📡 Infraestrutura</option>
+            <option value="missoes">🎯 Missões</option>
           </select>
         </div>
       </div>`,
@@ -1206,8 +1215,7 @@ const Gerenciar = {
     );
   },
 
-  editarMotivo(id, desc, cat) {
-    const cats = ['Energia','Transmissão','Equipamento','Infraestrutura','Clima','Vandalismo','Outros'];
+  editarMotivo(id, desc, nicho) {
     Modal.open('Editar Motivo', `
       <div class="form-grid-2">
         <div style="grid-column:1/-1">
@@ -1215,10 +1223,10 @@ const Gerenciar = {
           <input class="form-input" id="mof-desc" value="${desc}">
         </div>
         <div>
-          <label class="form-label">Categoria</label>
-          <select class="form-select" id="mof-cat">
-            <option value="">—</option>
-            ${cats.map(c=>`<option ${c===cat?'selected':''}>${c}</option>`).join('')}
+          <label class="form-label">Nicho *</label>
+          <select class="form-select" id="mof-nicho">
+            <option value="infra"    ${nicho==='infra'   ?'selected':''}>📡 Infraestrutura</option>
+            <option value="missoes"  ${nicho==='missoes' ?'selected':''}>🎯 Missões</option>
           </select>
         </div>
       </div>`,
@@ -1232,7 +1240,7 @@ const Gerenciar = {
   async salvarMotivo(id = null) {
     const desc = document.getElementById('mof-desc')?.value?.trim();
     if (!desc) { Toast.show('Informe a descrição', 'error'); return; }
-    const payload = { descricao: desc, categoria: document.getElementById('mof-cat')?.value || null };
+    const payload = { descricao: desc, nicho: document.getElementById('mof-nicho')?.value || 'infra' };
     try {
       if (id) {
         const { error } = await db.from('motivos_falha').update(payload).eq('id', id);

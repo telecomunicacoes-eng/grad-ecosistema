@@ -387,65 +387,66 @@ const Dashboard = {
     const barW = parseFloat(pct);
     const barColor = barW >= 90 ? '#22c55e' : barW >= 75 ? '#fbbf24' : '#ef4444';
 
-    // Linha por RISP
-    const rispLinhas = risps.map(r => {
-      const sitesRisp  = sitesComRisp.filter(s => s.risp_id === r.id).length;
-      const probsRisp  = ocorrs.filter(o => {
+    // Cards por RISP
+    const rispCards = risps.map(r => {
+      const sitesRisp = sitesComRisp.filter(s => s.risp_id === r.id).length;
+      const probsRisp = ocorrs.filter(o => {
         const site = sitesComRisp.find(s => s.id === o.site_id);
         return site?.risp_id === r.id;
       });
       const inopR = probsRisp.filter(o => o.situacao === 'Inoperante').length;
       const opR   = Math.max(0, sitesRisp - probsRisp.length);
-      const pctR  = sitesRisp ? (opR / sitesRisp * 100).toFixed(0) : '—';
-      const cor   = parseInt(pctR) >= 90 ? '#22c55e' : parseInt(pctR) >= 75 ? '#fbbf24' : '#ef4444';
+      const pctR  = sitesRisp ? (opR / sitesRisp * 100).toFixed(0) : null;
+      const cor   = pctR === null ? '#6b7280' : parseInt(pctR) >= 90 ? '#22c55e' : parseInt(pctR) >= 75 ? '#fbbf24' : '#ef4444';
+      const pctW  = pctR ?? 0;
 
       return `
-        <tr>
-          <td><span class="risp-badge">${r.nome}</span></td>
-          <td style="text-align:center;color:var(--text2)">${sitesRisp}</td>
-          <td style="text-align:center;color:#34d399">${opR}</td>
-          <td style="text-align:center;color:#f87171">${inopR||'—'}</td>
-          <td style="text-align:center">
-            <span style="color:${cor};font-weight:700">${pctR}%</span>
-            <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px;margin-top:3px">
-              <div style="background:${cor};height:4px;border-radius:4px;width:${pctR||0}%"></div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="risp-badge">${r.nome}</span>
+            <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">${sitesRisp} sites</span>
+          </div>
+          <div style="display:flex;gap:16px;margin-bottom:8px">
+            <div>
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">OK</div>
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#34d399;line-height:1.1">${opR}</div>
             </div>
-          </td>
-        </tr>`;
+            <div>
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">INOP</div>
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:${inopR?'#f87171':'var(--text3)'};line-height:1.1">${inopR||'—'}</div>
+            </div>
+            <div style="margin-left:auto;text-align:right">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Disp.</div>
+              <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:${cor};line-height:1.1">${pctR !== null ? pctR+'%' : '—'}</div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.08);border-radius:4px;height:5px">
+            <div style="background:${cor};height:5px;border-radius:4px;width:${pctW}%;transition:width .5s"></div>
+          </div>
+        </div>`;
     }).join('');
 
     document.getElementById('dash-calculo').innerHTML = `
       <div class="card">
         <div class="card-title">Cálculo Operacional</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-              <span style="font-size:13px;color:var(--text2)">Disponibilidade geral da rede</span>
-              <span style="font-size:28px;font-weight:700;font-family:var(--mono);color:${barColor}">${pct}%</span>
-            </div>
-            <div style="background:rgba(255,255,255,.1);border-radius:8px;height:10px">
-              <div style="background:${barColor};height:10px;border-radius:8px;width:${barW}%;transition:width .5s"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text3)">
-              <span>${op} operando</span>
-              <span>${inop} inoperante${inop!==1?'s':''}</span>
-              <span>${inst} instáv${inst!==1?'eis':'el'}</span>
-              <span>${parc} parcial</span>
-              <span>${ml} modo local</span>
-            </div>
+        <div style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text2)">Disponibilidade geral da rede</span>
+            <span style="font-size:28px;font-weight:700;font-family:var(--mono);color:${barColor}">${pct}%</span>
           </div>
-          <div class="table-wrap" style="border:none">
-            <table>
-              <thead><tr>
-                <th>RISP</th>
-                <th style="text-align:center">Sites</th>
-                <th style="text-align:center">Ok</th>
-                <th style="text-align:center">Inop</th>
-                <th style="text-align:center">Disp.</th>
-              </tr></thead>
-              <tbody>${rispLinhas}</tbody>
-            </table>
+          <div style="background:rgba(255,255,255,.1);border-radius:8px;height:10px">
+            <div style="background:${barColor};height:10px;border-radius:8px;width:${barW}%;transition:width .5s"></div>
           </div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text3)">
+            <span>${op} operando</span>
+            <span>${inop} inoperante${inop!==1?'s':''}</span>
+            <span>${inst} instáv${inst!==1?'eis':'el'}</span>
+            <span>${parc} parcial</span>
+            <span>${ml} modo local</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">
+          ${rispCards}
         </div>
       </div>`;
   }
