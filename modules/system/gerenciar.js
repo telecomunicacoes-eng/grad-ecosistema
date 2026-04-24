@@ -780,7 +780,9 @@ const Gerenciar = {
       Gerenciar._risps      = risps  || [];
       Gerenciar._editingSiteId = null;
 
-      const rispOpts = (risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
+      const rispOpts = (risps||[])
+        .sort((a,b)=>(parseInt(a.nome.replace(/\D/g,''))||99)-(parseInt(b.nome.replace(/\D/g,''))||99))
+        .map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
 
       el.innerHTML = `
         <!-- ── FORMULÁRIO INLINE ────────────── -->
@@ -863,10 +865,10 @@ const Gerenciar = {
         <!-- ── FILTROS + TABELA ──────────────── -->
         <div class="card" style="padding:0">
           <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-            <input class="form-input" id="ger-site-busca" placeholder="Buscar nome, cidade..." oninput="Gerenciar._filtrarSites()" style="width:220px">
+            <input class="form-input" id="ger-site-busca" placeholder="Buscar nome, SBS, RISP, cidade..." oninput="Gerenciar._filtrarSites()" style="width:260px">
             <select class="form-select" id="ger-site-risp" onchange="Gerenciar._filtrarSites()" style="width:160px">
               <option value="">Todas as RISPs</option>
-              ${(risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('')}
+              ${(risps||[]).sort((a,b)=>(parseInt(a.nome.replace(/\D/g,''))||99)-(parseInt(b.nome.replace(/\D/g,''))||99)).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('')}
             </select>
             <select class="form-select" id="ger-site-prop" onchange="Gerenciar._filtrarSites()" style="width:130px">
               <option value="">Todos proprietários</option>
@@ -883,7 +885,7 @@ const Gerenciar = {
             <table id="ger-sites-tbl" class="table">
               <thead>
                 <tr>
-                  <th>Nome</th><th>Cidade</th><th>RISP</th><th>CR</th>
+                  <th>Nome</th><th>SBS</th><th>Cidade</th><th>RISP</th><th>CR</th>
                   <th>Tráfego</th><th>Prop.</th><th>Patrimônio</th>
                   <th>Coords</th><th>Status</th><th></th>
                 </tr>
@@ -911,7 +913,12 @@ const Gerenciar = {
       if (rispF  && s.risp_id !== rispF) return false;
       if (propF  && (ex.proprietario||'').toLowerCase() !== propF) return false;
       if (ativoF !== '' && String(s.ativo) !== ativoF) return false;
-      if (busca  && !(s.nome?.toLowerCase().includes(busca) || s.cidade?.toLowerCase().includes(busca))) return false;
+      if (busca  && !(
+        s.nome?.toLowerCase().includes(busca) ||
+        s.cidade?.toLowerCase().includes(busca) ||
+        (s.sbs||'').toLowerCase().includes(busca) ||
+        (s.risp?.nome||'').toLowerCase().includes(busca)
+      )) return false;
       return true;
     });
 
@@ -935,8 +942,13 @@ const Gerenciar = {
         : '—';
       const isEditing = Gerenciar._editingSiteId === s.id;
 
+      const sbsCell = s.sbs
+        ? `<span style="font-family:var(--mono);font-size:11px;color:#67e8f9;background:rgba(103,232,249,.08);padding:2px 7px;border-radius:4px;border:1px solid rgba(103,232,249,.2)">${s.sbs}</span>`
+        : `<span style="color:var(--text3);font-size:11px">—</span>`;
+
       return `<tr id="ger-site-row-${s.id}" style="${isEditing?'background:rgba(245,158,11,.07)':''}">
         <td><strong style="color:var(--text)">${s.nome||'—'}</strong></td>
+        <td>${sbsCell}</td>
         <td style="color:var(--text2)">${s.cidade||'—'}</td>
         <td><span class="risp-badge">${s.risp?.nome||'—'}</span></td>
         <td style="color:var(--text3);font-size:12px">${ex.cr||'—'}</td>
@@ -952,7 +964,7 @@ const Gerenciar = {
           </div>
         </td>
       </tr>`;
-    }).join('') || '<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3)">Nenhum site encontrado</td></tr>';
+    }).join('') || '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--text3)">Nenhum site encontrado</td></tr>';
   },
 
   _cancelarEdicaoSite() {
@@ -1318,7 +1330,9 @@ const Gerenciar = {
   },
 
   novoUsuario() {
-    const rispOpts = (Gerenciar._risps||[]).map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
+    const rispOpts = (Gerenciar._risps||[])
+      .sort((a,b)=>(parseInt(a.nome.replace(/\D/g,''))||99)-(parseInt(b.nome.replace(/\D/g,''))||99))
+      .map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
     Modal.open('Novo Usuário', `
       <div class="form-grid-2">
         <div>
@@ -1351,7 +1365,9 @@ const Gerenciar = {
   editarUsuario(id) {
     const u       = (Gerenciar._usuarios||[]).find(x => x.id === id);
     if (!u) return;
-    const rispOpts = (Gerenciar._risps||[]).map(r=>`<option value="${r.id}" ${r.id===u.risp_id?'selected':''}>${r.nome}</option>`).join('');
+    const rispOpts = (Gerenciar._risps||[])
+      .sort((a,b)=>(parseInt(a.nome.replace(/\D/g,''))||99)-(parseInt(b.nome.replace(/\D/g,''))||99))
+      .map(r=>`<option value="${r.id}" ${r.id===u.risp_id?'selected':''}>${r.nome}</option>`).join('');
     Modal.open('Editar Usuário', `
       <div class="form-grid-2">
         <div>
