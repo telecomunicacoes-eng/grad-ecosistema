@@ -91,9 +91,12 @@ const Dashboard = {
           .order('inicio', { ascending: true })
       );
 
-      // RISPs (para cálculo operacional)
-      const risps = await dbQuery(d =>
-        d.from('risps').select('id,nome').order('nome')
+      // RISPs (para cálculo operacional) — ordem numérica
+      const _rispsRaw = await dbQuery(d =>
+        d.from('risps').select('id,nome')
+      );
+      const risps = (_rispsRaw || []).sort((a,b) =>
+        (parseInt(a.nome.replace(/\D/g,''))||0) - (parseInt(b.nome.replace(/\D/g,''))||0)
       );
 
       // Sites com situação (para cálculo por RISP)
