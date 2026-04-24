@@ -462,17 +462,12 @@ const Base = {
           5:{ cellWidth:20, halign:'center', font:'courier' },
           6:{ cellWidth:20, halign:'center', font:'courier' },
         },
-        didDrawCell(data) {
-          // Colorir coluna Status
+        didParseCell(data) {
           if (data.section==='body' && data.column.index===4) {
-            const sit = data.cell.raw;
-            const cor = sitCor[sit];
+            const cor = sitCor[data.cell.raw];
             if (cor) {
-              doc.setTextColor(...cor);
-              doc.setFont('helvetica','bold');
-              doc.text(sit, data.cell.x+data.cell.width/2, data.cell.y+data.cell.height/2+1, { align:'center' });
-              doc.setTextColor(0);
-              doc.setFont('helvetica','normal');
+              data.cell.styles.textColor    = cor;
+              data.cell.styles.fontStyle    = 'bold';
             }
           }
         },
