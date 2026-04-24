@@ -962,6 +962,7 @@ const Gerenciar = {
           <div class="perm-edit" style="display:flex;gap:4px">
             <button class="btn btn-ghost btn-sm" onclick="Gerenciar.editarSite('${s.id}')">✎ editar</button>
             <button class="btn btn-ghost btn-sm" onclick="Gerenciar.toggleSite('${s.id}',${!s.ativo})">${s.ativo?'Desativar':'Ativar'}</button>
+            <button class="btn btn-ghost btn-sm perm-admin" onclick="Gerenciar.excluirSite('${s.id}','${(s.nome||'').replace(/'/g,"\\'")}')" style="color:#f87171;border-color:rgba(248,113,113,.3)">🗑</button>
           </div>
         </td>
       </tr>`;
@@ -1080,6 +1081,32 @@ const Gerenciar = {
     } catch (err) {
       if (fb) { fb.textContent = 'Erro: ' + (err.message || 'desconhecido'); fb.style.color = '#f87171'; }
       Toast.show(err.message || 'Erro ao salvar', 'error');
+    }
+  },
+
+  async excluirSite(id, nome) {
+    Modal.open('Excluir site', `
+      <p style="color:var(--text2);margin-bottom:12px">Tem certeza que deseja <strong style="color:#f87171">excluir permanentemente</strong> o site:</p>
+      <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:16px">${nome}</p>
+      <p style="font-size:12px;color:var(--text3)">⚠️ Esta ação não pode ser desfeita. As ocorrências vinculadas a este site continuarão existindo.</p>`,
+      [
+        { label: 'Cancelar', class: 'btn-ghost', onclick: 'Modal.close()' },
+        { label: '🗑 Excluir permanentemente', class: 'btn-primary', onclick: `Gerenciar._confirmarExcluirSite('${id}')`, style: 'background:#ef4444;border-color:#ef4444' }
+      ]
+    );
+  },
+
+  async _confirmarExcluirSite(id) {
+    try {
+      const { error } = await db.from('sites').delete().eq('id', id);
+      if (error) throw error;
+      await Audit.apagou?.('sites', id);
+      Modal.close();
+      Toast.show('Site excluído permanentemente', 'warn');
+      Gerenciar._sites = (Gerenciar._sites || []).filter(s => s.id !== id);
+      Gerenciar._filtrarSites();
+    } catch (err) {
+      Toast.show(err.message || 'Erro ao excluir site', 'error');
     }
   },
 
