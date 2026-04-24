@@ -1,0 +1,28 @@
+name: DB Keep-Alive
+
+# Pinga o Supabase a cada 2 dias para evitar que o banco durma (free tier)
+# Também pode ser disparado manualmente pela aba Actions no GitHub
+
+on:
+  schedule:
+    - cron: '0 8 */2 * *'   # 08:00 UTC a cada 2 dias
+    - cron: '0 20 */2 * *'  # 20:00 UTC a cada 2 dias (2x por dia)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Acordar banco Supabase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase — risps
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: sb_publishable_0TeYa3IR4XWMvhdcfjk8MA_SrhoOaiZ" \
+            -H "Authorization: Bearer sb_publishable_0TeYa3IR4XWMvhdcfjk8MA_SrhoOaiZ" \
+            "https://fjlwmqixqewkwweekhcz.supabase.co/rest/v1/risps?select=id&limit=1")
+          echo "Status HTTP: $STATUS"
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Banco respondeu — online"
+          else
+            echo "⚠️ Banco retornou status $STATUS"
+          fi
