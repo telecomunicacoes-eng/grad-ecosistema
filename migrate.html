@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>GRAD — Migração Supabase → Firestore</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f13; color: #e2e8f0; font-family: monospace; padding: 32px; }
+  h1 { color: #60a5fa; margin-bottom: 8px; font-size: 20px; }
+  p  { color: #94a3b8; margin-bottom: 24px; font-size: 13px; }
+  .card { background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .log { background: #0a0a0f; border: 1px solid #1e1e2e; border-radius: 8px; padding: 16px;
+         font-size: 12px; height: 420px; overflow-y: auto; font-family: monospace; }
+  .log p { color: #94a3b8; margin: 0; padding: 2px 0; }
+  .log p.ok  { color: #34d399; }
+  .log p.err { color: #f87171; }
+  .log p.info { color: #60a5fa; }
+  .log p.warn { color: #fbbf24; }
+  button { background: #3b82f6; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 22px; font-size: 14px; cursor: pointer; font-family: monospace; }
+  button:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  .progress { background: #1e1e2e; border-radius: 6px; height: 8px; margin-top: 12px; overflow: hidden; }
+  .progress-bar { background: #3b82f6; height: 100%; width: 0%; transition: width .3s; border-radius: 6px; }
+  .stat { display:flex; gap: 24px; margin-top: 12px; flex-wrap: wrap; }
+  .stat span { font-size: 12px; color: #94a3b8; }
+  .stat strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>🔥 GRAD — Migração Supabase → Firebase Firestore</h1>
+<p>Este script lê todos os dados do Supabase e importa para o Firestore do projeto <strong>grad-ecosistema</strong>.</p>
+
+<div class="card">
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <button id="btn-migrate" onclick="iniciarMigracao()">▶ Iniciar migração completa</button>
+    <button id="btn-clear" onclick="limparLog()" style="background:#374151">🗑 Limpar log</button>
+  </div>
+  <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+  <div class="stat" id="stat-box"></div>
+</div>
+
+<div class="card">
+  <div class="log" id="log"></div>
+</div>
+
+<!-- Supabase (origem) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Firebase (destino) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script>
+// ── CONFIGURAÇÕES ─────────────────────────────────────────────────────────
+const SB_URL  = 'https://fjlwmqixqewkwweekhcz.supabase.co';
+const SB_KEY  = 'sb_publishable_0TeYa3IR4XWMvhdcfjk8MA_SrhoOaiZ';
+
+const FB_CONFIG = {
+  apiKey:            'AIzaSyBZSERiYncVn6Mxp2253EFyZ1NjOx7ZrsM',
+  authDomain:        'grad-ecosistema.firebaseapp.com',
+  projectId:         'grad-ecosistema',
+  storageBucket:     'grad-ecosistema.firebasestorage.app',
+  messagingSenderId: '472543843717',
+  appId:             '1:472543843717:web:580a80ad592b1a5309a0ec'
+};
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+const sbClient = supabase.createClient(SB_URL, SB_KEY);
+firebase.initializeApp(FB_CONFIG);
+const fdb = firebase.firestore();
+
+let _total = 0, _ok = 0, _err = 0;
+
+// ── LOG ───────────────────────────────────────────────────────────────────
+function log(msg, tipo = '') {
+  const div = document.getElementById('log');
+  const p   = document.createElement('p');
+  p.className = tipo;
+  p.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+  div.appendChild(p);
+  div.scrollTop = div.scrollHeight;
+}
+function limparLog() {
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('stat-box').innerHTML = '';
+  document.getElementById('progress-bar').style.width = '0%';
+  _total = _ok = _err = 0;
+}
+function setProgress(pct) {
+  document.getElementById('progress-bar').style.width = Math.min(100, pct) + '%';
+}
+function updateStats() {
+  document.getElementById('stat-box').innerHTML =
+    `<span>Total: <strong>${_total}</strong></span>` +
+    `<span style="color:#34d399">Migrados: <strong>${_ok}</strong></span>` +
+    `<span style="color:#f87171">Erros: <strong>${_err}</strong></span>`;
+}
+
+// ── MIGRAR COLEÇÃO GENÉRICA ───────────────────────────────────────────────
+async function migrarColecao(tabela, colecaoFs, transformFn = null, pagina = 1000) {
+  log(`📦 Iniciando migração de "${tabela}"...`, 'info');
+  let from = 0, total = 0, paginas = 0;
+
+  while (true) {
+    const { data, error } = await sbClient
+      .from(tabela)
+      .select('*')
+      .range(from, from + pagina - 1);
+
+    if (error) { log(`❌ Erro ao ler "${tabela}": ${error.message}`, 'err'); _err++; break; }
+    if (!data?.length) break;
+
+    // Escreve em batch (Firestore: max 500/batch)
+    const chunks = [];
+    for (let i = 0; i < data.length; i += 499) chunks.push(data.slice(i, i + 499));
+
+    for (const chunk of chunks) {
+      const batch = fdb.batch();
+      for (const row of chunk) {
+        const doc = transformFn ? transformFn(row) : row;
+        const { id, ...rest } = doc;
+        // Remove undefined values (Firestore não aceita)
+        const clean = JSON.parse(JSON.stringify(rest));
+        const ref = fdb.collection(colecaoFs).doc(String(id));
+        batch.set(ref, clean);
+      }
+      await batch.commit();
+      total += chunk.length;
+      _ok   += chunk.length;
+      _total += chunk.length;
+    }
+
+    paginas++;
+    log(`  ✓ Página ${paginas}: ${data.length} registros migrados (total: ${total})`, 'ok');
+    updateStats();
+
+    if (data.length < pagina) break;
+    from += pagina;
+  }
+
+  log(`✅ "${tabela}" concluído — ${total} registros no Firestore`, 'ok');
+  return total;
+}
+
+// ── MIGRAÇÃO COMPLETA ─────────────────────────────────────────────────────
+async function iniciarMigracao() {
+  const btn = document.getElementById('btn-migrate');
+  btn.disabled = true;
+  btn.textContent = '⏳ Migrando...';
+  limparLog();
+
+  log('🚀 Iniciando migração completa Supabase → Firestore', 'info');
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+
+  const etapas = [
+    // [tabela Supabase, coleção Firestore, função de transformação]
+    ['risps',         'risps',         null],
+    ['sites',         'sites',         null],
+    ['motivos_falha', 'motivos_falha', null],
+    ['ocorrencias',   'ocorrencias',   null],
+    ['usuarios',      'usuarios',      null],
+  ];
+
+  let totalGeral = 0;
+  for (let i = 0; i < etapas.length; i++) {
+    const [tabela, colecao, fn] = etapas[i];
+    setProgress((i / etapas.length) * 90);
+    try {
+      const n = await migrarColecao(tabela, colecao, fn);
+      totalGeral += n;
+    } catch (e) {
+      log(`❌ Falha em "${tabela}": ${e.message}`, 'err');
+      _err++;
+    }
+    log('──────────────────────────────────────────────────', '');
+  }
+
+  setProgress(100);
+  log('', '');
+  log(`🎉 MIGRAÇÃO CONCLUÍDA — ${totalGeral} registros transferidos para o Firestore!`, 'ok');
+  log('', '');
+  log('Próximos passos:', 'info');
+  log('  1. Acesse Firebase Console → Authentication → Users', 'info');
+  log('  2. Crie os usuários (email + senha) manualmente', 'info');
+  log('  3. O sistema já está configurado para usar o Firestore', 'info');
+
+  btn.disabled = false;
+  btn.textContent = '✓ Migração concluída — rodar novamente?';
+  updateStats();
+}
+</script>
+</body>
+</html>
