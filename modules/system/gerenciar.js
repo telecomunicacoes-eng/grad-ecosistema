@@ -795,6 +795,10 @@ const Gerenciar = {
               <input class="form-input" id="sf-nome" placeholder="Nome do local">
             </div>
             <div>
+              <label class="form-label">SBS</label>
+              <input class="form-input" id="sf-sbs" placeholder="Ex: 9001" type="text">
+            </div>
+            <div>
               <label class="form-label">Cidade</label>
               <input class="form-input" id="sf-cidade" placeholder="Cidade">
             </div>
@@ -817,6 +821,16 @@ const Gerenciar = {
               <label class="form-label">Proprietário</label>
               <select class="form-select" id="sf-prop">
                 <option>SESP</option><option>GEFRON</option><option>PRF</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Fase</label>
+              <select class="form-select" id="sf-fase">
+                <option value="">— Sem fase —</option>
+                <option value="Fase 1">Fase 1</option>
+                <option value="Fase 2">Fase 2</option>
+                <option value="Fase 3">Fase 3</option>
+                <option value="Fase 4">Fase 4</option>
               </select>
             </div>
             <div>
@@ -944,9 +958,10 @@ const Gerenciar = {
   _cancelarEdicaoSite() {
     Gerenciar._editingSiteId = null;
     // Limpa formulário
-    ['sf-nome','sf-cidade','sf-cr','sf-lat','sf-lng','sf-patrimonio'].forEach(id => {
+    ['sf-nome','sf-sbs','sf-cidade','sf-cr','sf-lat','sf-lng','sf-patrimonio'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    const sfFase = document.getElementById('sf-fase'); if (sfFase) sfFase.value = '';
     const sfRisp = document.getElementById('sf-risp'); if (sfRisp) sfRisp.value = '';
     const sfTraf = document.getElementById('sf-trafego'); if (sfTraf) sfTraf.value = 'BT';
     const sfProp = document.getElementById('sf-prop'); if (sfProp) sfProp.value = 'SESP';
@@ -970,6 +985,7 @@ const Gerenciar = {
     // Preenche formulário
     const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
     set('sf-nome',       s.nome || '');
+    set('sf-sbs',        s.sbs  || '');
     set('sf-cidade',     s.cidade || '');
     set('sf-cr',         ex.cr || '');
     set('sf-lat',        s.latitude  != null ? s.latitude  : '');
@@ -980,6 +996,7 @@ const Gerenciar = {
     const sfTraf = document.getElementById('sf-trafego'); if (sfTraf) sfTraf.value = ex.trafego || 'BT';
     const sfProp = document.getElementById('sf-prop'); if (sfProp) sfProp.value = ex.proprietario || 'SESP';
     const sfAtiv = document.getElementById('sf-ativo'); if (sfAtiv) sfAtiv.value = String(s.ativo !== false);
+    const sfFase = document.getElementById('sf-fase'); if (sfFase) sfFase.value = s.fase || '';
 
     // Modo edição
     document.getElementById('sf-form-title').textContent = `Editando: ${s.nome}`;
@@ -1018,13 +1035,18 @@ const Gerenciar = {
     const proprietario = document.getElementById('sf-prop')?.value                || 'SESP';
     const patrimonio   = document.getElementById('sf-patrimonio')?.value?.trim()   || '';
 
+    const sbsRaw = document.getElementById('sf-sbs')?.value?.trim() || null;
+    const fase   = document.getElementById('sf-fase')?.value || null;
+
     const payload = {
       nome,
+      sbs:         sbsRaw,
       cidade:      document.getElementById('sf-cidade')?.value?.trim()  || null,
       risp_id:     document.getElementById('sf-risp')?.value            || null,
       ativo:       document.getElementById('sf-ativo')?.value !== 'false',
       latitude:    isNaN(lat)  ? null : lat,
       longitude:   isNaN(lng)  ? null : lng,
+      fase:        fase,
       observacoes: Gerenciar._serializeSiteExtras(cr, trafego, proprietario, patrimonio),
     };
 
