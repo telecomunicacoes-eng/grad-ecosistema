@@ -198,7 +198,8 @@ const Gerenciar = {
   async _renderRispListDados() {
     const el = document.getElementById('risp-list-gerenciar');
     if (!el) return;
-    const risps = await dbQuery(d => d.from('risps').select('id,nome').order('nome')) || [];
+    const _rispsRaw = await dbQuery(d => d.from('risps').select('id,nome')) || [];
+    const risps = _rispsRaw.sort((a,b) => (parseInt(a.nome.replace(/\D/g,''))||99) - (parseInt(b.nome.replace(/\D/g,''))||99));
     el.innerHTML = risps.map(r => {
       return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
         <span style="flex:1;font-size:12px;color:var(--text2)">${r.nome}</span>
@@ -1100,7 +1101,8 @@ const Gerenciar = {
   async _renderRisps() {
     const el = document.getElementById('gerenciar-conteudo');
     try {
-      const risps = await dbQuery(d => d.from('risps').select('*').order('nome'));
+      const _rispsRaw2 = await dbQuery(d => d.from('risps').select('*')) || [];
+      const risps = _rispsRaw2.sort((a,b) => (parseInt(a.nome.replace(/\D/g,''))||99) - (parseInt(b.nome.replace(/\D/g,''))||99));
       el.innerHTML = `
         <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
           <button class="btn btn-primary btn-sm" onclick="Gerenciar.novaRisp()">+ Nova RISP</button>
