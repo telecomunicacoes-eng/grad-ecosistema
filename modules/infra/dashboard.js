@@ -251,22 +251,52 @@ const Dashboard = {
         data: {
           labels: motivoEntries.map(e => e[0]),
           datasets: [{ data: motivoEntries.map(e => e[1]),
-            backgroundColor: '#3b82f6', borderRadius: 4, barThickness: 14
+            backgroundColor: 'rgba(59,130,246,0.85)', borderRadius: 4, barThickness: 10
           }]
         },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-          layout: { padding: { right: 40 } },
-          plugins: { legend: { display: false } },
+          layout: { padding: { right: 48, top: 4, bottom: 4 } },
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: false }, // caso plugin ativo
+          },
           scales: {
             x: { display: false, grid: { display: false } },
             y: {
-              afterFit: a => { a.width = 160; },
-              ticks: { font: { size: 10 }, color: '#c4d8f0' },
+              afterFit: a => { a.width = 190; },
+              ticks: {
+                font: { size: 13, weight: '500' },
+                color: '#d4e6ff',
+                padding: 6
+              },
               grid: { display: false }
             }
+          },
+          animation: { duration: 400 },
+          // Desenha o número no final de cada barra
+          plugins: {
+            legend: { display: false },
+            afterDraw: undefined
           }
-        }
+        },
+        plugins: [{
+          id: 'barLabels',
+          afterDatasetsDraw(chart) {
+            const { ctx, data } = chart;
+            chart.getDatasetMeta(0).data.forEach((bar, i) => {
+              const val = data.datasets[0].data[i];
+              if (!val) return;
+              ctx.save();
+              ctx.fillStyle = '#93c5fd';
+              ctx.font = 'bold 13px IBM Plex Mono, monospace';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(val, bar.x + 8, bar.y);
+              ctx.restore();
+            });
+          }
+        }]
       });
     }
 
