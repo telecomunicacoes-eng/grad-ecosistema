@@ -313,12 +313,11 @@ const Ocorrencias = {
 
   // ── NOVA OCORRÊNCIA ──────────────────
   async abrirNova() {
-    let sitesOpts  = '<option value="">Selecione um site...</option>';
     let motivoOpts = '<option value="">Selecione o motivo...</option>';
     try {
-      const sites  = await dbQuery(d => d.from('sites').select('id,nome').eq('ativo',true).order('nome'));
+      const sites   = await dbQuery(d => d.from('sites').select('id,nome,sbs').eq('ativo',true).order('nome'));
       const motivos = await dbQuery(d => d.from('motivos_falha').select('id,descricao').eq('nicho','infra').order('descricao'));
-      sitesOpts  = '<option value="">Selecione um site...</option>' + (sites||[]).map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+      Ocorrencias._sitesCache = sites || [];
       motivoOpts = '<option value="">Selecione o motivo...</option>' + (motivos||[]).map(m=>`<option value="${m.id}">${m.descricao}</option>`).join('');
     } catch {}
 
@@ -326,7 +325,15 @@ const Ocorrencias = {
       <div class="form-grid form-grid-2">
         <div style="grid-column:1/-1">
           <label class="form-label">Site *</label>
-          <select class="form-select" id="noc-site">${sitesOpts}</select>
+          <div style="position:relative">
+            <input class="form-input" id="noc-site-busca" placeholder="Digite nome ou SBS do site..."
+              autocomplete="off" oninput="Ocorrencias._filtrarSiteAC(this.value,'noc')"
+              onblur="setTimeout(()=>{const l=document.getElementById('noc-site-lista');if(l)l.style.display='none'},200)">
+            <input type="hidden" id="noc-site">
+            <div id="noc-site-lista" style="position:absolute;top:100%;left:0;right:0;z-index:9999;
+              background:var(--surface2);border:1px solid var(--border2);border-radius:8px;margin-top:2px;
+              max-height:220px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+          </div>
         </div>
         <div>
           <label class="form-label">Situação *</label>
@@ -404,6 +411,40 @@ const Ocorrencias = {
     } catch (err) {
       Toast.show(err.message || 'Erro ao registrar', 'error');
     }
+  },
+
+  // ── AUTOCOMPLETE DE SITE ─────────────
+  _filtrarSiteAC(busca, prefix) {
+    const lista  = document.getElementById(`${prefix}-site-lista`);
+    const hidden = document.getElementById(`${prefix}-site`);
+    if (!lista) return;
+    if (!busca?.trim()) {
+      lista.style.display = 'none';
+      if (hidden) hidden.value = '';
+      return;
+    }
+    const q = busca.toLowerCase();
+    const matches = (Ocorrencias._sitesCache || [])
+      .filter(s => s.nome?.toLowerCase().includes(q) || (s.sbs||'').toLowerCase().includes(q))
+      .slice(0, 12);
+    if (!matches.length) { lista.style.display = 'none'; return; }
+    lista.innerHTML = matches.map(s => `
+      <div onclick="Ocorrencias._selecionarSiteAC('${s.id}','${(s.nome||'').replace(/'/g,"\\'")}','${s.sbs||''}','${prefix}')"
+        style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"
+        onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+        ${s.sbs ? `<span style="font-family:var(--mono);font-size:11px;color:#67e8f9;background:rgba(103,232,249,.08);padding:1px 6px;border-radius:4px;border:1px solid rgba(103,232,249,.2);white-space:nowrap">${s.sbs}</span>` : ''}
+        <span>${s.nome||'—'}</span>
+      </div>`).join('');
+    lista.style.display = 'block';
+  },
+
+  _selecionarSiteAC(id, nome, sbs, prefix) {
+    const hidden = document.getElementById(`${prefix}-site`);
+    const input  = document.getElementById(`${prefix}-site-busca`);
+    const lista  = document.getElementById(`${prefix}-site-lista`);
+    if (hidden) hidden.value = id;
+    if (input)  input.value  = sbs ? `${sbs} — ${nome}` : nome;
+    if (lista)  lista.style.display = 'none';
   },
 
   // ── VER DETALHES ─────────────────────
